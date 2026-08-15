@@ -1,0 +1,138 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@db/sqlite@0.13": "0.13.0",
+    "jsr:@denosaurs/plug@1": "1.1.0",
+    "jsr:@std/assert@1": "1.0.19",
+    "jsr:@std/cli@^1.0.32": "1.0.32",
+    "jsr:@std/encoding@1": "1.0.11",
+    "jsr:@std/fmt@1": "1.0.10",
+    "jsr:@std/fmt@^1.0.10": "1.0.10",
+    "jsr:@std/fs@1": "1.0.24",
+    "jsr:@std/internal@^1.0.12": "1.0.14",
+    "jsr:@std/internal@^1.0.14": "1.0.14",
+    "jsr:@std/path@1": "1.0.9",
+    "jsr:@std/path@1.0": "1.0.9",
+    "jsr:@std/path@^1.1.5": "1.1.6",
+    "npm:@cle-does-things/llms-sdk@~0.2.3": "0.2.3"
+  },
+  "jsr": {
+    "@db/sqlite@0.13.0": {
+      "integrity": "4545c635e0b3d4ddfdc0f2240f932f24b8ad0178e9c2e3a0f9403e7b18ae2fb5",
+      "dependencies": [
+        "jsr:@denosaurs/plug",
+        "jsr:@std/path@1.0"
+      ]
+    },
+    "@denosaurs/plug@1.1.0": {
+      "integrity": "eb2f0b7546c7bca2000d8b0282c54d50d91cf6d75cb26a80df25a6de8c4bc044",
+      "dependencies": [
+        "jsr:@std/encoding",
+        "jsr:@std/fmt@1",
+        "jsr:@std/fs",
+        "jsr:@std/path@1"
+      ]
+    },
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal@^1.0.12"
+      ]
+    },
+    "@std/cli@1.0.32": {
+      "integrity": "188b3a100d6202d64e3f5bd3d799c7fa4f6d77f92cc65eb7f641c1fa0aa92a66",
+      "dependencies": [
+        "jsr:@std/fmt@^1.0.10",
+        "jsr:@std/internal@^1.0.14"
+      ]
+    },
+    "@std/encoding@1.0.11": {
+      "integrity": "e7cef2f0b3153bccc17431e7c864a1de03a4b6d9647389c43e08aaa775d37385"
+    },
+    "@std/fmt@1.0.10": {
+      "integrity": "90dfba288802ac6de82fb31d0917eb9e4450b9925b954d5e51fc29ac07419db5"
+    },
+    "@std/fs@1.0.24": {
+      "integrity": "f3061b45b81673a2bece689da041df32d174be064c89eb6397fb5718d3fb7877",
+      "dependencies": [
+        "jsr:@std/internal@^1.0.14",
+        "jsr:@std/path@^1.1.5"
+      ]
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    },
+    "@std/path@1.0.9": {
+      "integrity": "260a49f11edd3db93dd38350bf9cd1b4d1366afa98e81b86167b4e3dd750129e"
+    },
+    "@std/path@1.1.6": {
+      "integrity": "c68485c2a4dfbb5ae3cc74fae4e8c4e5d874cf8a8ed12927917235c758b46cbe",
+      "dependencies": [
+        "jsr:@std/internal@^1.0.14"
+      ]
+    }
+  },
+  "npm": {
+    "@cle-does-things/llms-sdk-darwin-arm64@0.2.3": {
+      "integrity": "sha512-xUQLAmpXyLXPrqLBjKYuIfgM13yZj8f2czxC737xXCYvbtvFQJENEY9/BH7w2RXOwhLuVh6bEcDDxpBNcpZSEw==",
+      "os": ["darwin"],
+      "cpu": ["arm64"]
+    },
+    "@cle-does-things/llms-sdk-darwin-x64@0.2.3": {
+      "integrity": "sha512-0rRutVH9+2NA0y0OCaoqY3H5JNOzbVcWsN2sXdiiZ/ugR5zwrI7B2Sw9OsJIHZXBuncHvWcDhgHLb+IHRO25lg==",
+      "os": ["darwin"],
+      "cpu": ["x64"]
+    },
+    "@cle-does-things/llms-sdk-linux-arm64-gnu@0.2.3": {
+      "integrity": "sha512-sxmVmN+0CnIcLwlFVYykDy4fFc40Z0pahOVBbsvhK020xZkvLHqvW1Arl8FaREJHVnfn9DkW0Hjdwsk8N6uyoQ==",
+      "os": ["linux"],
+      "cpu": ["arm64"]
+    },
+    "@cle-does-things/llms-sdk-linux-arm64-musl@0.2.3": {
+      "integrity": "sha512-ghzcgTPFH067++o05YFW4JinIlomiNED0QiHPZkDFZaob4hj4uYkqw9gJQB/TVuInmF3R9CizdO2XeUPR5CJAQ==",
+      "os": ["linux"],
+      "cpu": ["arm64"]
+    },
+    "@cle-does-things/llms-sdk-linux-x64-gnu@0.2.3": {
+      "integrity": "sha512-u0p3jiIiF3G8OOCeE5rDLo4l2D0bMyOql1Ns20ZCTTuQaxdwdJfnf+liCn3PpxwVqm8w5Uhvs+XrbpupvFLZLw==",
+      "os": ["linux"],
+      "cpu": ["x64"]
+    },
+    "@cle-does-things/llms-sdk-linux-x64-musl@0.2.3": {
+      "integrity": "sha512-gSjdNSZ8niIm1EU52ti2l9s+aTfZs9JIy6iTvnj+C9P3e6g9DeNQOJbIbZRCdGRjYSACHvz8q8fkwvKMdAhEkQ==",
+      "os": ["linux"],
+      "cpu": ["x64"]
+    },
+    "@cle-does-things/llms-sdk-win32-arm64-msvc@0.2.3": {
+      "integrity": "sha512-FMEABVQI4gSFTINJc93PeEEfRKjgFx43gMzMIGWbwcufIgOfhBW0Eh/r7SynqlPyHfyh3vnJ55Nm4cEevflSzg==",
+      "os": ["win32"],
+      "cpu": ["arm64"]
+    },
+    "@cle-does-things/llms-sdk-win32-x64-msvc@0.2.3": {
+      "integrity": "sha512-AjOMotXI3c2VuRe/ZKlQqWNS3Ob+fWnMwADpQf+7ZqDbVuJBKZV1oZ2pTZTEFka5pDQ6OcRRFuQvljGWbhMcTg==",
+      "os": ["win32"],
+      "cpu": ["x64"]
+    },
+    "@cle-does-things/llms-sdk@0.2.3": {
+      "integrity": "sha512-txxhMq3HIZ05LGAFG0VxcwfYGAM3hXSD/+JQ+VNGi47xAaIYK2SBqO0VQ4Zp8EuKg9VMUDIuIpyVCfhZr+EKiw==",
+      "optionalDependencies": [
+        "@cle-does-things/llms-sdk-darwin-arm64",
+        "@cle-does-things/llms-sdk-darwin-x64",
+        "@cle-does-things/llms-sdk-linux-arm64-gnu",
+        "@cle-does-things/llms-sdk-linux-arm64-musl",
+        "@cle-does-things/llms-sdk-linux-x64-gnu",
+        "@cle-does-things/llms-sdk-linux-x64-musl",
+        "@cle-does-things/llms-sdk-win32-arm64-msvc",
+        "@cle-does-things/llms-sdk-win32-x64-msvc"
+      ]
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@db/sqlite@0.13",
+      "jsr:@std/assert@1",
+      "jsr:@std/cli@^1.0.32",
+      "npm:@cle-does-things/llms-sdk@~0.2.3"
+    ]
+  }
+}
