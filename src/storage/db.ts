@@ -3,7 +3,7 @@ import { Database } from "@db/sqlite";
 export const LIGHTAGENT_DB_PATH = "lightagent/sessions.sqlite";
 let dbClient: undefined | Database = undefined;
 
-function homeDir(): string | undefined {
+export function homeDir(): string | undefined {
   return Deno.build.os === "windows"
     ? Deno.env.get("USERPROFILE")
     : Deno.env.get("HOME");

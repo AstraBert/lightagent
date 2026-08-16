@@ -7,7 +7,11 @@
     "@cle-does-things/llms-sdk": "npm:@cle-does-things/llms-sdk@^0.2.3",
     "@db/sqlite": "jsr:@db/sqlite@^0.13.0",
     "@std/assert": "jsr:@std/assert@1",
-    "@std/cli": "jsr:@std/cli@^1.0.32"
+    "@std/cli": "jsr:@std/cli@^1.0.32",
+    "@std/fs": "jsr:@std/fs@^1.0.24",
+    "@std/path": "jsr:@std/path@^1.1.6",
+    "@valibot/to-json-schema": "npm:@valibot/to-json-schema@^1.7.1",
+    "valibot": "npm:valibot@^1.4.2"
   },
   "compile": {
     "include": [
