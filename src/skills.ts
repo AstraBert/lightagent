@@ -1,31 +1,9 @@
 import * as path from "@std/path";
 import { homeDir } from "./storage/db.ts";
 import { extractYaml } from "@std/front-matter";
+import { assertValidSkillName, exists } from "./assertions.ts";
 
 export const SKILLS_PATH = ".agents/skills";
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await Deno.stat(path);
-  } catch (e) {
-    if (e instanceof Deno.errors.NotFound) {
-      return false;
-    }
-    throw e;
-  }
-  return true;
-}
-
-function assertValidSkillName(skillName: string) {
-  if (skillName.length === 0 || skillName.length > 64) {
-    throw new Error(`Invalid skill name: ${skillName}`);
-  }
-  // Lowercase letters, numbers, hyphens only. Max 64 chars.
-  // No leading/trailing hyphen (also excludes empty string and "-").
-  if (!/^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/.test(skillName)) {
-    throw new Error(`Invalid skill name: ${skillName}`);
-  }
-}
 
 export async function getSkillPath(skillName: string) {
   assertValidSkillName(skillName);

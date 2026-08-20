@@ -4,6 +4,7 @@ import { toJsonSchema } from "@valibot/to-json-schema";
 import { Tool } from "@cle-does-things/llms-sdk";
 import { JsonValue, ToolResult } from "./events.ts";
 import { getSkillPath, parseSkill } from "./skills.ts";
+import { assertFileWithinWorkspace, assertUniqueString } from "./assertions.ts";
 
 type ToolParametersSchema = v.ObjectSchema<
   v.ObjectEntries,
@@ -56,3 +57,132 @@ export class SkillsTool extends ToolFunction {
     }
   }
 }
+
+export class ReadTool extends ToolFunction {
+  readonly name: string = "read";
+  readonly description: string =
+    "Call this tool to read a text-based file, optionally with an offset and maximum number of characters to read";
+  readonly inputSchema = v.object({
+    file_path: v.pipe(v.string(), v.description("Path of the file to read")),
+    offset: v.pipe(v.optional(v.number()), v.description("Read the file starting from this offset. Defaults to zero.")),
+    max_chars: v.pipe(v.optional(v.number()), v.description("Maximum number of characters to read from the offset. Reads the file to the end by default."))
+  });
+
+  async execute(input: JsonValue): Promise<ToolResult> {
+    try {
+      const validated = v.parse(this.inputSchema, input);
+      const cwd = Deno.cwd()
+      const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
+      let content = await Deno.readTextFile(resolved)
+      if (typeof validated.offset !== "undefined") {
+        content = content.slice(validated.offset)
+      }
+      if (typeof validated.max_chars !== "undefined") {
+        content = content.slice(0, validated.max_chars)
+      }
+      return { type: "success", result: content };
+    } catch (e) {
+      return {
+        type: "error",
+        error: `An error occurred while executing the \`read\` tool: ${e}`,
+      };
+    }
+  }
+}
+
+
+export class WriteTool extends ToolFunction {
+  readonly name: string = "write";
+  readonly description: string =
+    "Write the file, by providing a path and the text content to write.";
+  readonly inputSchema = v.object({
+    file_path: v.pipe(v.string(), v.description("Path of the file to write")),
+    content: v.pipe(v.string(), v.description("Content to write to the file")),
+  });
+
+  async execute(input: JsonValue): Promise<ToolResult> {
+    try {
+      const validated = v.parse(this.inputSchema, input);
+      const cwd = Deno.cwd()
+      const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
+      await Deno.writeTextFile(resolved, validated.content);
+      return { type: "success", result: `Wrote ${validated.content.length} characters to ${resolved}` };
+    } catch (e) {
+      return {
+        type: "error",
+        error: `An error occurred while executing the \`write\` tool: ${e}`,
+      };
+    }
+  }
+}
+
+export class EditTool extends ToolFunction {
+  readonly name: string = "edit";
+  readonly description: string =
+    "Edit a text-based file by replacing an old string with a new one.";
+  readonly inputSchema = v.object({
+    file_path: v.pipe(v.string(), v.description("Path of the file to edit")),
+    old_string: v.pipe(v.string(), v.description("Old string to replace. Must be unique unless `replace_all` is set to True.")),
+    new_string: v.pipe(v.string(), v.description("New string to replace the old with")),
+    replace_all: v.pipe(v.optional(v.boolean()), v.description("Replace all the occurrences of `old_string` with `new_string`. Defaults to False (checks if `old_string` is unique, fails if not)"))
+  });
+
+  async execute(input: JsonValue): Promise<ToolResult> {
+    try {
+      const validated = v.parse(this.inputSchema, input);
+      if (validated.old_string === "") {
+        return {
+          type: "error",
+          error: "`old_string` should not be empty"
+        }
+      }
+      const cwd = Deno.cwd()
+      const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
+      let content = await Deno.readTextFile(resolved);
+      if (validated.replace_all) {
+        content = content.replaceAll(validated.old_string, validated.new_string)
+      } else {
+        assertUniqueString(content, validated.old_string)
+        content = content.replace(validated.old_string, validated.new_string)
+      }
+      await Deno.writeTextFile(resolved, content);
+      return { type: "success", result: `Edited ${resolved}` };
+    } catch (e) {
+      return {
+        type: "error",
+        error: `An error occurred while executing the \`edit\` tool: ${e}`,
+      };
+    }
+  }
+}
+
+// export class ShellTool extends ToolFunction {
+//   readonly name: string = "shell";
+//   readonly description: string =
+//     "Execute a shell command, with an optional timeout. Do not use this tool to perform destructive and irreversible operations such `rm -rf /`";
+//   readonly inputSchema = v.object({
+//     command: v.pipe(v.string(), v.description("Command executable to run")),
+//     args: v.pipe(v.array(v.string()), v.description("Arguments for the executable")),
+//     timeout: v.pipe(v.optional(v.number()), v.description("Timeout (in seconds) for the shell command. Defaults to 60 seconds."))
+//   })
+
+//   override async execute(input: JsonValue): Promise<ToolResult> {
+//     try {
+//       const validated = v.parse(this.inputSchema, input)
+//       const cmd = new Deno.Command(validated.command, {
+//         args: validated.args,
+//         stdout: "piped",
+//         stderr: "piped",
+//         stdin: "null"
+//       })
+//       const child = cmd.spawn();
+//       const output = await child.output();
+
+//     } catch (e) {
+//       return {
+//         type: "error",
+//         error: `An error occurred while executing the \`shell\` tool: ${e}`,
+//       };
+//     }
+//   }
+// }
