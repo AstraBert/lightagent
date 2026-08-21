@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "dev": "deno run --watch --allow-net src/main.ts",
+    "dev": "deno run --watch --allow-net --allow-run --allow-read --allow-env --allow-ffi src/main.ts",
     "new-migration": "./scripts/generate-migration.py"
   },
   "imports": {

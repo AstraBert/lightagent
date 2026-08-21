@@ -156,33 +156,63 @@ export class EditTool extends ToolFunction {
   }
 }
 
-// export class ShellTool extends ToolFunction {
-//   readonly name: string = "shell";
-//   readonly description: string =
-//     "Execute a shell command, with an optional timeout. Do not use this tool to perform destructive and irreversible operations such `rm -rf /`";
-//   readonly inputSchema = v.object({
-//     command: v.pipe(v.string(), v.description("Command executable to run")),
-//     args: v.pipe(v.array(v.string()), v.description("Arguments for the executable")),
-//     timeout: v.pipe(v.optional(v.number()), v.description("Timeout (in seconds) for the shell command. Defaults to 60 seconds."))
-//   })
+export class ShellTool extends ToolFunction {
+  readonly name: string = "shell";
+  readonly description: string =
+    "Execute a shell command, with an optional timeout. Do not use this tool to perform destructive and irreversible operations such `rm -rf /`";
+  readonly inputSchema = v.object({
+    command: v.pipe(v.string(), v.description("Command executable to run")),
+    args: v.pipe(v.array(v.string()), v.description("Arguments for the executable")),
+    timeout: v.pipe(v.optional(v.number()), v.description("Timeout (in seconds) for the shell command. Defaults to 60 seconds."))
+  })
 
-//   override async execute(input: JsonValue): Promise<ToolResult> {
-//     try {
-//       const validated = v.parse(this.inputSchema, input)
-//       const cmd = new Deno.Command(validated.command, {
-//         args: validated.args,
-//         stdout: "piped",
-//         stderr: "piped",
-//         stdin: "null"
-//       })
-//       const child = cmd.spawn();
-//       const output = await child.output();
+  override async execute(input: JsonValue): Promise<ToolResult> {
+    try {
+      const validated = v.parse(this.inputSchema, input)
+      const cmd = new Deno.Command(validated.command, {
+        args: validated.args,
+        stdout: "piped",
+        stderr: "piped",
+        stdin: "null"
+      })
+      const child = cmd.spawn();
 
-//     } catch (e) {
-//       return {
-//         type: "error",
-//         error: `An error occurred while executing the \`shell\` tool: ${e}`,
-//       };
-//     }
-//   }
-// }
+      let timedOut = false;
+        const timer = setTimeout(() => {
+          timedOut = true;
+          try {
+            child.kill("SIGTERM");
+          } catch {
+            // process may have already exited
+          }
+        }, validated.timeout ? validated.timeout * 1000 : 60_000);
+
+        const { code, stdout, stderr, success } = await child.output();
+        clearTimeout(timer);
+
+        if (timedOut) {
+          return {
+            type: "error",
+            error: `Command timed out after ${validated.timeout ?? 60}s`
+          }
+        }
+
+        if (success) {
+          return {
+            type: "success",
+            result: `Command exited with ${code}.\n\nSTDOUT:\n\n${new TextDecoder().decode(stdout)}\n\nSTDERR:\n\n${new TextDecoder().decode(stderr)}`
+          }
+        } else {
+          return {
+            type: "error",
+            error: `Command exited with ${code}.\n\nSTDOUT:\n\n${new TextDecoder().decode(stdout)}\n\nSTDERR:\n\n${new TextDecoder().decode(stderr)}`
+          }
+        }
+    } catch (e) {
+      return {
+        type: "error",
+        error: `An error occurred while executing the \`shell\` tool: ${e}`,
+      };
+    }
+  }
+}
