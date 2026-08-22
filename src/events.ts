@@ -7,9 +7,11 @@ import {
 } from "@cle-does-things/llms-sdk";
 
 const SessionInitTypeSchema = v.picklist(["new", "resume"]);
+export type SessionInitType = v.InferOutput<typeof SessionInitTypeSchema>
 const ProviderSchema = v.picklist(["anthropic", "openai"]);
 export type Provider = v.InferOutput<typeof ProviderSchema>;
 const DeltaTypeSchema = v.picklist(["text", "thinking"]);
+export type DeltaType = v.InferOutput<typeof DeltaTypeSchema>;
 
 export type JsonData =
   | string
