@@ -1,17 +1,5 @@
 import * as path from "@std/path"
 
-export async function exists(path: string): Promise<boolean> {
-  try {
-    await Deno.stat(path);
-  } catch (e) {
-    if (e instanceof Deno.errors.NotFound) {
-      return false;
-    }
-    throw e;
-  }
-  return true;
-}
-
 export function assertValidSkillName(skillName: string) {
   if (skillName.length === 0 || skillName.length > 64) {
     throw new Error(`Invalid skill name: ${skillName}`);

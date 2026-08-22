@@ -1,10 +1,12 @@
 import * as v from "valibot";
 import { toJsonSchema } from "@valibot/to-json-schema";
 
-import { Tool } from "@cle-does-things/llms-sdk";
-import { JsonValue, ToolResult } from "./events.ts";
-import { getSkillPath, parseSkill } from "./skills.ts";
+import type { Tool } from "@cle-does-things/llms-sdk";
+import type { JsonValue, ToolResult } from "./events.ts";
+import type { SkillsClient } from "./skills.ts";
 import { assertFileWithinWorkspace, assertUniqueString } from "./assertions.ts";
+import type { FileSystem } from "./fs.ts";
+import type { Shell } from "./shell.ts";
 
 type ToolParametersSchema = v.ObjectSchema<
   v.ObjectEntries,
@@ -16,7 +18,7 @@ type ToolParametersSchema = v.ObjectSchema<
 Implementors define the JSON schema, description, and execution logic.
 The agent automatically serialises the LLM's arguments and validates them
 against `inputSchema` before calling `execute`. */
-export abstract class ToolFunction {
+export abstract class ToolFunction<Ctx> {
   /*  Unique tool name exposed to the LLM. */
   abstract name: string;
   /* Human-readable description exposed to the LLM. */
@@ -24,7 +26,7 @@ export abstract class ToolFunction {
   /* JSON Schema describing the arguments this tool accepts. */
   abstract inputSchema: ToolParametersSchema;
   /* Run the tool with the validated arguments. */
-  abstract execute(input: JsonValue): Promise<ToolResult>;
+  abstract execute(input: JsonValue, ctx: Ctx): Promise<ToolResult>;
   /* Convert this tool into the SDK representation used for chat requests. */
   toSdkTool(): Tool {
     return {
@@ -35,7 +37,7 @@ export abstract class ToolFunction {
   }
 }
 
-export class SkillsTool extends ToolFunction {
+export class SkillsTool extends ToolFunction<SkillsClient> {
   readonly name: string = "skills";
   readonly description: string =
     "Call this tool to load a skill, providing the name of the skill you are invoking";
@@ -43,11 +45,11 @@ export class SkillsTool extends ToolFunction {
     skill_name: v.pipe(v.string(), v.description("Name of the skill to load")),
   });
 
-  async execute(input: JsonValue): Promise<ToolResult> {
+  async execute(input: JsonValue, ctx: SkillsClient): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const skillPath = await getSkillPath(validated.skill_name);
-      const content = (await parseSkill(skillPath)).content;
+      const skillPath = await ctx.getSkillPath(validated.skill_name);
+      const content = (await ctx.parseSkill(skillPath)).content;
       return { type: "success", result: content };
     } catch (e) {
       return {
@@ -58,7 +60,7 @@ export class SkillsTool extends ToolFunction {
   }
 }
 
-export class ReadTool extends ToolFunction {
+export class ReadTool extends ToolFunction<FileSystem> {
   readonly name: string = "read";
   readonly description: string =
     "Call this tool to read a text-based file, optionally with an offset and maximum number of characters to read";
@@ -68,12 +70,12 @@ export class ReadTool extends ToolFunction {
     max_chars: v.pipe(v.optional(v.number()), v.description("Maximum number of characters to read from the offset. Reads the file to the end by default."))
   });
 
-  async execute(input: JsonValue): Promise<ToolResult> {
+  async execute(input: JsonValue, ctx: FileSystem): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const cwd = Deno.cwd()
+      const cwd = ctx.cwd()
       const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
-      let content = await Deno.readTextFile(resolved)
+      let content = await ctx.readToString(resolved)
       if (typeof validated.offset !== "undefined") {
         content = content.slice(validated.offset)
       }
@@ -91,7 +93,7 @@ export class ReadTool extends ToolFunction {
 }
 
 
-export class WriteTool extends ToolFunction {
+export class WriteTool extends ToolFunction<FileSystem> {
   readonly name: string = "write";
   readonly description: string =
     "Write the file, by providing a path and the text content to write.";
@@ -100,12 +102,12 @@ export class WriteTool extends ToolFunction {
     content: v.pipe(v.string(), v.description("Content to write to the file")),
   });
 
-  async execute(input: JsonValue): Promise<ToolResult> {
+  async execute(input: JsonValue, ctx: FileSystem): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const cwd = Deno.cwd()
+      const cwd = ctx.cwd()
       const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
-      await Deno.writeTextFile(resolved, validated.content);
+      await ctx.write(resolved, validated.content);
       return { type: "success", result: `Wrote ${validated.content.length} characters to ${resolved}` };
     } catch (e) {
       return {
@@ -116,7 +118,7 @@ export class WriteTool extends ToolFunction {
   }
 }
 
-export class EditTool extends ToolFunction {
+export class EditTool extends ToolFunction<FileSystem> {
   readonly name: string = "edit";
   readonly description: string =
     "Edit a text-based file by replacing an old string with a new one.";
@@ -127,7 +129,7 @@ export class EditTool extends ToolFunction {
     replace_all: v.pipe(v.optional(v.boolean()), v.description("Replace all the occurrences of `old_string` with `new_string`. Defaults to False (checks if `old_string` is unique, fails if not)"))
   });
 
-  async execute(input: JsonValue): Promise<ToolResult> {
+  async execute(input: JsonValue, ctx: FileSystem): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
       if (validated.old_string === "") {
@@ -136,16 +138,16 @@ export class EditTool extends ToolFunction {
           error: "`old_string` should not be empty"
         }
       }
-      const cwd = Deno.cwd()
+      const cwd = ctx.cwd()
       const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
-      let content = await Deno.readTextFile(resolved);
+      let content = await ctx.readToString(resolved);
       if (validated.replace_all) {
         content = content.replaceAll(validated.old_string, validated.new_string)
       } else {
         assertUniqueString(content, validated.old_string)
         content = content.replace(validated.old_string, validated.new_string)
       }
-      await Deno.writeTextFile(resolved, content);
+      await ctx.write(resolved, content);
       return { type: "success", result: `Edited ${resolved}` };
     } catch (e) {
       return {
@@ -156,7 +158,7 @@ export class EditTool extends ToolFunction {
   }
 }
 
-export class ShellTool extends ToolFunction {
+export class ShellTool extends ToolFunction<Shell> {
   readonly name: string = "shell";
   readonly description: string =
     "Execute a shell command, with an optional timeout. Do not use this tool to perform destructive and irreversible operations such `rm -rf /`";
@@ -166,29 +168,15 @@ export class ShellTool extends ToolFunction {
     timeout: v.pipe(v.optional(v.number()), v.description("Timeout (in seconds) for the shell command. Defaults to 60 seconds."))
   })
 
-  override async execute(input: JsonValue): Promise<ToolResult> {
+  override async execute(input: JsonValue, ctx: Shell): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input)
-      const cmd = new Deno.Command(validated.command, {
-        args: validated.args,
-        stdout: "piped",
-        stderr: "piped",
-        stdin: "null"
-      })
-      const child = cmd.spawn();
-
-      let timedOut = false;
-        const timer = setTimeout(() => {
-          timedOut = true;
-          try {
-            child.kill("SIGTERM");
-          } catch {
-            // process may have already exited
-          }
-        }, validated.timeout ? validated.timeout * 1000 : 60_000);
-
-        const { code, stdout, stderr, success } = await child.output();
-        clearTimeout(timer);
+        const { code, stdout, stderr, success, timedOut } = await ctx.exec(validated.command, validated.timeout ?? 60, {
+          args: validated.args,
+          stdout: "piped",
+          stderr: "piped",
+          stdin: "null"
+        })
 
         if (timedOut) {
           return {
@@ -200,12 +188,12 @@ export class ShellTool extends ToolFunction {
         if (success) {
           return {
             type: "success",
-            result: `Command exited with ${code}.\n\nSTDOUT:\n\n${new TextDecoder().decode(stdout)}\n\nSTDERR:\n\n${new TextDecoder().decode(stderr)}`
+            result: `Command exited with ${code}.\n\nSTDOUT:\n\n${stdout}\n\nSTDERR:\n\n${stderr}`
           }
         } else {
           return {
             type: "error",
-            error: `Command exited with ${code}.\n\nSTDOUT:\n\n${new TextDecoder().decode(stdout)}\n\nSTDERR:\n\n${new TextDecoder().decode(stderr)}`
+            error: `Command exited with ${code}.\n\nSTDOUT:\n\n${stdout}\n\nSTDERR:\n\n${stderr}`
           }
         }
     } catch (e) {

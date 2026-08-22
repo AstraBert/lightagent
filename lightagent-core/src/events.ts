@@ -1,8 +1,8 @@
 import * as v from "valibot";
 import {
-  Message,
-  MessagePart,
-  MessageRole,
+  type Message,
+  type MessagePart,
+  type MessageRole,
   textMessage,
 } from "@cle-does-things/llms-sdk";
 

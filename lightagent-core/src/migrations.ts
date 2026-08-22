@@ -1,11 +1,13 @@
-import { Database } from "@db/sqlite";
+import type { FileSystem } from "./fs.ts";
+import type { SqliteClient } from "./storage.ts";
+import * as path from "@std/path"
 
-async function getMigrations(): Promise<{ version: number; sql: string }[]> {
+async function getMigrations(fs: FileSystem): Promise<{ version: number; sql: string }[]> {
   const migrations: { version: number; sql: string }[] = [];
   const migrationsDir = new URL("./migrations/", import.meta.url);
-  for await (const entry of Deno.readDir(migrationsDir)) {
+  for await (const entry of fs.readDir(migrationsDir.toString())) {
     if (entry.name.endsWith(".sql")) {
-      const sql = await Deno.readTextFile(new URL(entry.name, migrationsDir));
+      const sql = await fs.readToString(path.join(migrationsDir, entry.name));
       const version = parseInt(entry.name.split("_")[0]!);
       migrations.push({ sql, version });
     }
@@ -14,7 +16,7 @@ async function getMigrations(): Promise<{ version: number; sql: string }[]> {
   return migrations;
 }
 
-function getCurrentMigration(db: Database): number {
+function getCurrentMigration<ExecReturnType>(db: SqliteClient): number {
   const stmt = db.prepare(
     "select name from sqlite_master where type='table' and name='_migrations'",
   );
@@ -22,18 +24,18 @@ function getCurrentMigration(db: Database): number {
   if (typeof exists === "undefined") {
     return 0;
   }
-  const versionStmt = db.prepare(
+  const versionStmt = db.prepare<{ version: number; applied_at: number }>(
     "select version, applied_at from _migrations order by applied_at desc, version desc",
   );
-  const version = versionStmt.get<{ version: number; applied_at: number }>();
+  const version = versionStmt.get();
   if (typeof version === "undefined") {
     return 0;
   }
   return version.version;
 }
 
-export async function applyMigrations(db: Database): Promise<void> {
-  const migrations = await getMigrations();
+export async function applyMigrations(db: SqliteClient, fs: FileSystem): Promise<void> {
+  const migrations = await getMigrations(fs);
   const currentVersion = getCurrentMigration(db);
   const toApply = migrations.filter((m) => m.version > currentVersion);
   for (const m of toApply) {
