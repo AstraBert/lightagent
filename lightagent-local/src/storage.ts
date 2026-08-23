@@ -1,6 +1,9 @@
 import { Database, type Statement as BaseStatement } from "@db/sqlite";
 import { SqliteClient, type SqlBindParameters, type SqlStatement } from "@cle-does-things/lightagent-core";
 import { LocalFileSystem } from "./fs.ts";
+import * as pathlib from "@std/path";
+
+export const LIGHTAGENT_DB_PATH = "lightagent/sessions.sqlite";
 
 export class LocalSqlStatement<T extends object> implements SqlStatement<T> {
   private base: BaseStatement<T>
@@ -19,40 +22,46 @@ export class LocalSqlStatement<T extends object> implements SqlStatement<T> {
 }
 
 export class LocalSqliteClient implements SqliteClient {
-  private readonly db: Database
+  dbPath: string
+  private db: Database | undefined = undefined
+  private fs: LocalFileSystem = new LocalFileSystem()
+
 
   constructor(path: string) {
-    this.db = new Database(path)
+    this.dbPath = path
   }
 
-  exec(sql: string, ...parameters: SqlBindParameters): void {
-    this.db.exec(sql, ...parameters)
+  async initDb(fs: LocalFileSystem) {
+    if (!this.db) {
+      await fs.mkdir(pathlib.dirname(this.dbPath), true)
+      this.db = new Database(this.dbPath);
+      this.db.exec("pragma journal_mode = WAL");
+      this.db.exec("pragma synchronous = NORMAL");
+    }
   }
 
-  prepare<T extends object>(sql: string): SqlStatement<T> {
-    const stmt = this.db.prepare<T>(sql)
+  async exec(sql: string, ...parameters: SqlBindParameters): Promise<void> {
+    await this.initDb(this.fs)
+    this.db!.exec(sql, ...parameters)
+  }
+
+  async prepare<T extends object>(sql: string): Promise<SqlStatement<T>> {
+    await this.initDb(this.fs)
+    const stmt = this.db!.prepare<T>(sql)
     return new LocalSqlStatement(stmt)
   }
 }
 
-export const LIGHTAGENT_DB_PATH = "lightagent/sessions.sqlite";
-let dbClient: undefined | LocalSqliteClient = undefined;
-
-export function getDbClient(fs: LocalFileSystem) {
-  if (!dbClient) {
-    const base = fs.homeDir();
-    if (!base) {
-      throw new Error(
-        `Could not find a home directory for the current environment. Ensure that the variable ${
-          Deno.build.os === "windows" ? "USERPROFILE" : "HOME"
-        } is set.`,
-      );
-    }
-    const path = (base.endsWith("/") ? base.slice(0, base.length - 1) : base) +
-      "/" + LIGHTAGENT_DB_PATH;
-    dbClient = new LocalSqliteClient(path);
-    dbClient.exec("pragma journal_mode = WAL");
-    dbClient.exec("pragma synchronous = NORMAL");
+export function getDbPath(fs: LocalFileSystem) {
+  const base = fs.homeDir();
+  if (!base) {
+    throw new Error(
+      `Could not find a home directory for the current environment. Ensure that the variable ${
+        fs.env.os() === "windows" ? "USERPROFILE" : "HOME"
+      } is set.`,
+    );
   }
-  return dbClient;
+  const path = (base.endsWith("/") ? base.slice(0, base.length - 1) : base) +
+    "/" + LIGHTAGENT_DB_PATH;
+  return path
 }

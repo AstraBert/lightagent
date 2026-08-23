@@ -27,9 +27,9 @@ export interface SqlStatement<T> {
 
 export interface SqliteClient {
   /* Execute a non-readonly SQL statement, optionally specifying bind parameters */
-  exec(sql: string, ...parameters: SqlBindParameters): void,
+  exec(sql: string, ...parameters: SqlBindParameters): Promise<void>,
   /* Execute a `select` statement, optionally specifying bind parameters */
-  prepare<T extends object>(sql: string): SqlStatement<T>,
+  prepare<T extends object>(sql: string): Promise<SqlStatement<T>>,
 }
 
 export class AgentStorage {
@@ -52,7 +52,7 @@ export class AgentStorage {
 
   async store(event: AgentEvent): Promise<void> {
     await this.initStorage();
-    this.db.exec(
+    await this.db.exec(
       "insert into events (session_id, payload, created_at) values (:sessionId, :payload, :createdAt)",
       {
         sessionId: event.sessionId,
@@ -64,8 +64,8 @@ export class AgentStorage {
 
   async getSessionEvents(sessionId: string): Promise<AgentEvent[]> {
     await this.initStorage();
-    const stmt = this.db.prepare<{ payload: string }>(
-      "select payload from events where session_id = :sessionId order by created_at, id",
+    const stmt = await this.db.prepare<{ payload: string }>(
+      "select payload from events where session_id = :sessionId order by id, created_at",
     );
     const events = stmt.all({ sessionId });
     const agentEvents: AgentEvent[] = [];

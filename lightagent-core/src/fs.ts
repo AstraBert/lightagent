@@ -47,6 +47,7 @@ export interface FileSystem {
   stat: (path: string) => Promise<FileInfo>,
   homeDir: () => string | undefined,
   cwd: () => string,
+  mkdir: (path: string, recursive: boolean) => Promise<void>
 }
 
 export async function exists(path: string, fs: FileSystem): Promise<boolean> {

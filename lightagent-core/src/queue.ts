@@ -1,6 +1,7 @@
 interface QueueItem<T> {
   chunk?: T;
   done?: boolean;
+  isError?: boolean;
 }
 
 export class AsyncQueue<T> {

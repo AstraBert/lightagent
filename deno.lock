@@ -179,6 +179,7 @@
   "workspace": {
     "dependencies": [
       "jsr:@std/crypto@^1.1.0",
+      "jsr:@std/path@^1.1.6",
       "npm:@cle-does-things/llms-sdk@~0.2.3",
       "npm:@valibot/to-json-schema@^1.7.1",
       "npm:p-limit@^7.3.1"
@@ -188,7 +189,6 @@
         "dependencies": [
           "jsr:@std/assert@1",
           "jsr:@std/front-matter@^1.0.9",
-          "jsr:@std/path@^1.1.6",
           "npm:valibot@^1.4.2"
         ]
       },

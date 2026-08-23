@@ -1,4 +1,4 @@
-import { Environment } from "@cle-does-things/lightagent-core"
+import { Environment, OSType } from "@cle-does-things/lightagent-core"
 
 export class LocalEnvironment implements Environment {
   get(key: string): string | undefined {
@@ -15,5 +15,9 @@ export class LocalEnvironment implements Environment {
 
   delete(key: string): void {
     Deno.env.delete(key)
+  }
+
+  os(): OSType {
+    return Deno.build.os
   }
 }

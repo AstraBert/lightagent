@@ -34,4 +34,8 @@ export class LocalFileSystem implements FileSystem {
   cwd(): string {
     return Deno.cwd()
   }
+
+  async mkdir(path: string, recursive: boolean): Promise<void> {
+    return await Deno.mkdir(path, { recursive })
+  }
 }
