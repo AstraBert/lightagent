@@ -11,7 +11,7 @@ export class SkillsClient {
     this.fs = fs
   }
 
-  async getSkillPath(skillName: string) {
+  async getSkillPath(skillName: string): Promise<string> {
     assertValidSkillName(skillName);
     const globalPath = path.join(this.fs.homeDir()!, this.basePath, skillName, "SKILL.md");
     const localPath = path.join(".", this.basePath, skillName, "SKILL.md");
@@ -25,7 +25,7 @@ export class SkillsClient {
     );
   }
 
-  async parseSkill(skillPath: string) {
+  async parseSkill(skillPath: string): Promise<{description: string, content: string}> {
     const content = await this.fs.readToString(skillPath);
     const parsed = extractYaml<{
       name: string;
@@ -39,7 +39,7 @@ export class SkillsClient {
   }
 
 
-  async findSkills() {
+  async findSkills(): Promise<Map<string, string>> {
     const globalPath = path.join(this.fs.homeDir()!, this.basePath);
     const localPath = path.join(".", this.basePath);
     const map: Map<string, string> = new Map();

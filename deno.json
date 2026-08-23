@@ -1,6 +1,8 @@
 {
   "workspace": ["./lightagent-core", "./lightagent-local", "./lightagent-do"],
   "imports": {
-    "@cle-does-things/llms-sdk": "npm:@cle-does-things/llms-sdk@^0.2.3"
+    "@cle-does-things/llms-sdk": "npm:@cle-does-things/llms-sdk@^0.2.3",
+    "@std/crypto": "jsr:@std/crypto@^1.1.0",
+    "@valibot/to-json-schema": "npm:@valibot/to-json-schema@^1.7.1"
   }
 }

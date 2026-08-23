@@ -66,9 +66,11 @@ const UsageSchema = v.object({
   latency: v.number(),
   inputTokens: v.number(),
   outputTokens: v.number(),
-  cacheWritetokens: v.number(),
+  cacheWriteTokens: v.number(),
   cacheReadTokens: v.number(),
 });
+
+export type Usage = v.InferOutput<typeof UsageSchema>
 
 const SessionInitEventSchema = v.object({
   type: v.literal("session.init"),

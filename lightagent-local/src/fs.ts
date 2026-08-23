@@ -1,6 +1,9 @@
 import { FileSystem, DirEntry, FileInfo, FileNotFoundError } from "@cle-does-things/lightagent-core";
+import { LocalEnvironment } from "./environment.ts";
 
 export class LocalFileSystem implements FileSystem {
+  env: LocalEnvironment = new LocalEnvironment()
+
   async readToString(path: string): Promise<string> {
     return await Deno.readTextFile(path)
   }
@@ -25,9 +28,7 @@ export class LocalFileSystem implements FileSystem {
   }
 
   homeDir(): string | undefined {
-    return Deno.build.os === "windows"
-      ? Deno.env.get("USERPROFILE")
-      : Deno.env.get("HOME");
+    return this.env.get("USERPROFILE") ?? this.env.get("HOME");
   }
 
   cwd(): string {

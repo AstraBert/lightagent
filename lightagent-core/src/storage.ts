@@ -27,7 +27,7 @@ export interface SqlStatement<T> {
 
 export interface SqliteClient {
   /* Execute a non-readonly SQL statement, optionally specifying bind parameters */
-  exec<T>(sql: string, ...parameters: SqlBindParameters): T,
+  exec(sql: string, ...parameters: SqlBindParameters): void,
   /* Execute a `select` statement, optionally specifying bind parameters */
   prepare<T extends object>(sql: string): SqlStatement<T>,
 }
@@ -43,14 +43,14 @@ export class AgentStorage {
     this.initialized = false;
   }
 
-  private async initStorage() {
+  private async initStorage(): Promise<void> {
     if (!this.initialized) {
       await applyMigrations(this.db, this.fs);
       this.initialized = true;
     }
   }
 
-  async store(event: AgentEvent) {
+  async store(event: AgentEvent): Promise<void> {
     await this.initStorage();
     this.db.exec(
       "insert into events (session_id, payload, created_at) values (:sessionId, :payload, :createdAt)",

@@ -1,3 +1,5 @@
+import type { Environment } from "@cle-does-things/lightagent-core";
+
 export interface FileInfo {
   isFile: boolean;
   isDirectory: boolean;
@@ -38,6 +40,7 @@ export class FileNotFoundError extends Error {
 }
 
 export interface FileSystem {
+  env: Environment
   readToString: (path: string) => Promise<string>,
   readDir: (path: string) => AsyncIterable<DirEntry>,
   write: (path: string, content: string) => Promise<void>,

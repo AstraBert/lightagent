@@ -1,6 +1,6 @@
 import * as path from "@std/path"
 
-export function assertValidSkillName(skillName: string) {
+export function assertValidSkillName(skillName: string): void {
   if (skillName.length === 0 || skillName.length > 64) {
     throw new Error(`Invalid skill name: ${skillName}`);
   }
@@ -25,7 +25,7 @@ export function assertFileWithinWorkspace(filePath: string, basePath: string): s
 }
 
 
-export function assertUniqueString(container: string, contained: string) {
+export function assertUniqueString(container: string, contained: string): void {
   if (container.indexOf(contained) === container.lastIndexOf(contained)) {
     return
   }

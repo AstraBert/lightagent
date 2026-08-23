@@ -25,8 +25,10 @@ export abstract class ToolFunction<Ctx> {
   abstract description: string;
   /* JSON Schema describing the arguments this tool accepts. */
   abstract inputSchema: ToolParametersSchema;
+  /* Context for tool execution */
+  ctx: Ctx;
   /* Run the tool with the validated arguments. */
-  abstract execute(input: JsonValue, ctx: Ctx): Promise<ToolResult>;
+  abstract execute(input: JsonValue): Promise<ToolResult>;
   /* Convert this tool into the SDK representation used for chat requests. */
   toSdkTool(): Tool {
     return {
@@ -34,6 +36,10 @@ export abstract class ToolFunction<Ctx> {
       description: this.description,
       parameters: toJsonSchema(this.inputSchema),
     };
+  }
+
+  constructor(ctx: Ctx) {
+    this.ctx = ctx
   }
 }
 
@@ -45,11 +51,15 @@ export class SkillsTool extends ToolFunction<SkillsClient> {
     skill_name: v.pipe(v.string(), v.description("Name of the skill to load")),
   });
 
-  async execute(input: JsonValue, ctx: SkillsClient): Promise<ToolResult> {
+  constructor(ctx: SkillsClient) {
+    super(ctx)
+  }
+
+  async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const skillPath = await ctx.getSkillPath(validated.skill_name);
-      const content = (await ctx.parseSkill(skillPath)).content;
+      const skillPath = await this.ctx.getSkillPath(validated.skill_name);
+      const content = (await this.ctx.parseSkill(skillPath)).content;
       return { type: "success", result: content };
     } catch (e) {
       return {
@@ -70,12 +80,16 @@ export class ReadTool extends ToolFunction<FileSystem> {
     max_chars: v.pipe(v.optional(v.number()), v.description("Maximum number of characters to read from the offset. Reads the file to the end by default."))
   });
 
-  async execute(input: JsonValue, ctx: FileSystem): Promise<ToolResult> {
+  constructor(ctx: FileSystem) {
+    super(ctx)
+  }
+
+  async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const cwd = ctx.cwd()
+      const cwd = this.ctx.cwd()
       const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
-      let content = await ctx.readToString(resolved)
+      let content = await this.ctx.readToString(resolved)
       if (typeof validated.offset !== "undefined") {
         content = content.slice(validated.offset)
       }
@@ -102,12 +116,16 @@ export class WriteTool extends ToolFunction<FileSystem> {
     content: v.pipe(v.string(), v.description("Content to write to the file")),
   });
 
-  async execute(input: JsonValue, ctx: FileSystem): Promise<ToolResult> {
+  constructor(ctx: FileSystem) {
+    super(ctx)
+  }
+
+  async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const cwd = ctx.cwd()
+      const cwd = this.ctx.cwd()
       const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
-      await ctx.write(resolved, validated.content);
+      await this.ctx.write(resolved, validated.content);
       return { type: "success", result: `Wrote ${validated.content.length} characters to ${resolved}` };
     } catch (e) {
       return {
@@ -129,7 +147,11 @@ export class EditTool extends ToolFunction<FileSystem> {
     replace_all: v.pipe(v.optional(v.boolean()), v.description("Replace all the occurrences of `old_string` with `new_string`. Defaults to False (checks if `old_string` is unique, fails if not)"))
   });
 
-  async execute(input: JsonValue, ctx: FileSystem): Promise<ToolResult> {
+  constructor(ctx: FileSystem) {
+    super(ctx)
+  }
+
+  async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
       if (validated.old_string === "") {
@@ -138,16 +160,16 @@ export class EditTool extends ToolFunction<FileSystem> {
           error: "`old_string` should not be empty"
         }
       }
-      const cwd = ctx.cwd()
+      const cwd = this.ctx.cwd()
       const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
-      let content = await ctx.readToString(resolved);
+      let content = await this.ctx.readToString(resolved);
       if (validated.replace_all) {
         content = content.replaceAll(validated.old_string, validated.new_string)
       } else {
         assertUniqueString(content, validated.old_string)
         content = content.replace(validated.old_string, validated.new_string)
       }
-      await ctx.write(resolved, content);
+      await this.ctx.write(resolved, content);
       return { type: "success", result: `Edited ${resolved}` };
     } catch (e) {
       return {
@@ -168,10 +190,14 @@ export class ShellTool extends ToolFunction<Shell> {
     timeout: v.pipe(v.optional(v.number()), v.description("Timeout (in seconds) for the shell command. Defaults to 60 seconds."))
   })
 
-  override async execute(input: JsonValue, ctx: Shell): Promise<ToolResult> {
+  constructor(ctx: Shell) {
+    super(ctx)
+  }
+
+  override async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input)
-        const { code, stdout, stderr, success, timedOut } = await ctx.exec(validated.command, validated.timeout ?? 60, {
+        const { code, stdout, stderr, success, timedOut } = await this.ctx.exec(validated.command, validated.timeout ?? 60, {
           args: validated.args,
           stdout: "piped",
           stderr: "piped",
