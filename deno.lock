@@ -22,6 +22,7 @@
     "jsr:@std/yaml@^1.0.5": "1.2.0",
     "npm:@cle-does-things/llms-sdk@~0.2.3": "0.2.3",
     "npm:@valibot/to-json-schema@^1.7.1": "1.7.1_valibot@1.4.2",
+    "npm:p-limit@^7.3.1": "7.3.1",
     "npm:valibot@^1.4.2": "1.4.2"
   },
   "jsr": {
@@ -162,15 +163,25 @@
         "valibot"
       ]
     },
+    "p-limit@7.3.1": {
+      "integrity": "sha512-0trZaiG7Y7kN/Egy9a8j47t9osC0Tch4PaIWd9yGF6bvmlk7muExRvGNYb8sXBwEKMoNKsbNN9P8EefuQekE4Q==",
+      "dependencies": [
+        "yocto-queue"
+      ]
+    },
     "valibot@1.4.2": {
       "integrity": "sha512-gjdCvJ6d3RyHAneqxMYMW9QMCwYMb3jpOO0IyHZV1bnRHFBHrX3VkIILt5XYR0WhwHiH7Mty8ovuPZ/O3gamrg=="
+    },
+    "yocto-queue@1.2.2": {
+      "integrity": "sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ=="
     }
   },
   "workspace": {
     "dependencies": [
       "jsr:@std/crypto@^1.1.0",
       "npm:@cle-does-things/llms-sdk@~0.2.3",
-      "npm:@valibot/to-json-schema@^1.7.1"
+      "npm:@valibot/to-json-schema@^1.7.1",
+      "npm:p-limit@^7.3.1"
     ],
     "members": {
       "lightagent-core": {

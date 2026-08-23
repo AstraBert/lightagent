@@ -1,11 +1,29 @@
-// import { AgentEvent, AgentStorage, convertEventsToMessages, EditTool, Provider, ReadTool, SessionInitType, ShellTool, SkillsClient, SkillsTool, WriteTool, Usage, AsyncQueue } from "@cle-does-things/lightagent-core";
+// import {
+//   AgentEvent,
+//   AgentStorage,
+//   convertEventsToMessages,
+//   messageToAssistantContent,
+//   EditTool,
+//   Provider,
+//   ReadTool,
+//   SessionInitType,
+//   ShellTool,
+//   SkillsClient,
+//   SkillsTool,
+//   WriteTool,
+//   Usage,
+//   AsyncQueue,
+//   ToolFunction,
+//   JsonValue,
+//   ToolResult} from "@cle-does-things/lightagent-core";
 // import { LocalFileSystem } from "./fs.ts";
 // import { getDbClient, LocalSqliteClient } from "./storage.ts";
 // import { LocalShell } from "./shell.ts";
 // import { LocalEnvironment } from "./environment.ts";
 // import { toJsonSchema } from "@valibot/to-json-schema";
-// import { ApiType, Llm, LlmRequest, Message, MessageRole, textMessage } from "@cle-does-things/llms-sdk";
+// import { ApiType, Llm, LlmRequest, Message, MessageRole, textMessage, ToolCallPart } from "@cle-does-things/llms-sdk";
 // import { crypto } from "@std/crypto/crypto";
+// import pLimit from "p-limit"
 
 // const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 // const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1"
@@ -42,6 +60,7 @@
 // seems compelling enough for the task at hand.
 // </tools_and_skills_usage>
 // </guidelines>`
+// const MAX_CONCURRENT_TOOL_CALLS = 10
 
 // function resolveCredentials(env: LocalEnvironment, provider?: Provider, apiKey?: string): {provider: Provider, apiKey: string} {
 //   if (apiKey && provider) {
@@ -287,6 +306,9 @@
 //         promptCacheTtl: this.promptCaching ? this.provider === "anthropic" ? "5m" : "30m" : undefined,
 //       } as LlmRequest;
 //       const queue = new AsyncQueue<AgentEvent>()
+//       let toolCalls: ToolCallPart[] = []
+//       let toolResultMessages: Message[] = []
+//       let assistantMessage: Message | null = null
 //       this.llmClient.streamResponse(request, (err, chunk) => {
 //         if (err) {
 //           queue.push({
@@ -294,7 +316,7 @@
 //               type: "session.stop" as const,
 //               success: false,
 //               timestamp: new Date(),
-//               error: `An error occurred while trying to store an event in the SQLite database: ${e}`,
+//               error: `An error occurred while generating the agent response: ${err}`,
 //               usage: {
 //                 cacheReadTokens,
 //                 cacheWriteTokens,
@@ -312,11 +334,177 @@
 //           queue.push({done: true})
 //           return
 //         }
-
+//         switch (chunk.type) {
+//           case "textDelta":
+//             queue.push({chunk: {
+//                 type: "stream.delta",
+//                 delta: chunk.textDelta ?? "",
+//                 deltaType: "text",
+//                 turnId,
+//                 sessionId: resolvedSid,
+//                 timestamp: new Date(),
+//               }
+//             })
+//             break
+//           case "thinkingDelta":
+//             queue.push({chunk: {
+//               type: "stream.delta",
+//               delta: chunk.thinkingDelta ?? "",
+//               deltaType: "thinking",
+//               turnId,
+//               sessionId: resolvedSid,
+//               timestamp: new Date(),
+//             }})
+//             break
+//           case "complete": {
+//             assistantMessage = chunk.message
+//             toolCalls = chunk.toolCalls ?? []
+//             if (chunk.usage) {
+//               inputTokens += chunk.usage.inputTokens
+//               outputTokens += chunk.usage.outputTokens
+//               cacheReadTokens += chunk.usage.cacheReadTokens ?? 0
+//               cacheWriteTokens += chunk.usage.cacheWriteTokens ?? 0
+//             }
+//             queue.push({chunk: {
+//               type: "assistant.response",
+//               content: messageToAssistantContent(chunk.message.content),
+//               sessionId: resolvedSid,
+//               turnId,
+//               timestamp: new Date(),
+//             }})
+//             break
+//           }
+//           default:
+//         }
 //       })
+
+//       let hasError = false
+
+//       while (true) {
+//         const item = await queue.next();
+//         if (item.done && item.chunk) {
+//           hasError = true
+//           errEvent = await this.safeStore(item.chunk, resolvedSid, {
+//             inputTokens,
+//             outputTokens,
+//             cacheReadTokens,
+//             cacheWriteTokens,
+//             latency: Date.now() - Number(sessionStart)
+//           })
+//           if (errEvent) {
+//             yield errEvent
+//             break
+//           }
+//           yield item.chunk
+//           break;
+//         } else if (item.done && !item.chunk) {
+//           break
+//         } else {
+//           errEvent = await this.safeStore(item.chunk!, resolvedSid, {
+//             inputTokens,
+//             outputTokens,
+//             cacheReadTokens,
+//             cacheWriteTokens,
+//             latency: Date.now() - Number(sessionStart)
+//           })
+//           if (errEvent) {
+//             hasError = true
+//             yield errEvent
+//             break
+//           }
+//           yield item.chunk!;
+//         }
+//       }
+
+//       if (!assistantMessage) {
+//         break
+//       }
+
+//       if (hasError) {
+//         break
+//       }
+
+//       if (toolCalls.length === 0) {
+//         const stopEvent: AgentEvent = {
+//           type: "session.stop",
+//           timestamp: new Date(),
+//           success: true,
+//           result: messageToAssistantContent((assistantMessage as Message).content),
+//           sessionId: resolvedSid,
+//           usage: {
+//             inputTokens,
+//             cacheReadTokens,
+//             cacheWriteTokens,
+//             outputTokens,
+//             latency: Date.now() - Number(sessionStart)
+//           }
+//         }
+//         errEvent = await this.safeStore(stopEvent, resolvedSid, {
+//           inputTokens,
+//           cacheReadTokens,
+//           cacheWriteTokens,
+//           outputTokens,
+//           latency: Date.now() - Number(sessionStart)
+//         })
+//         if (errEvent) {
+//           yield errEvent
+//           break
+//         }
+//         yield stopEvent
+//         break
+//       }
+//       this.history.push(assistantMessage)
+//       const limit = pLimit(this.parallelToolCalls ? MAX_CONCURRENT_TOOL_CALLS : 1)
+//       const executeToolWithCallId = async (execFn: (input: JsonValue) => Promise<ToolResult>, args: string, callId: string) => {
+//         const result = await execFn(JSON.parse(args))
+//         return { result, callId }
+//       }
+//       const promises = []
+//       for (const toolCall of toolCalls) {
+//         if (Object.keys(this.tools).includes(toolCall.name)) {
+//           const toolCallEventAny: AgentEvent = { type: "tool.call_any", timestamp: new Date(), input: JSON.parse(toolCall.arguments), name: toolCall.name, turnId, sessionId: resolvedSid, toolCallId: toolCall.id }
+//           errEvent = await this.safeStore(toolCallEventAny, resolvedSid, {
+//             outputTokens,
+//             inputTokens,
+//             cacheReadTokens,
+//             cacheWriteTokens,
+//             latency: Date.now() - Number(sessionStart)
+//           })
+//           if (errEvent) {
+//             yield errEvent
+//             break
+//           }
+//           if (toolCall.name != "skills") {
+//             const toolCallEvent: AgentEvent = { type: "tool.call", timestamp: new Date(), input: JSON.parse(toolCall.arguments), name: toolCall.name, turnId, sessionId: resolvedSid, toolCallId: toolCall.id }
+//             yield toolCallEvent
+//           } else {
+//             const payload: { skill_name: string } = JSON.parse(toolCall.arguments)
+//             const skillLoadEvent: AgentEvent = { type: "skill.load", timestamp: new Date(), turnId, sessionId: resolvedSid,  skillName: payload.skill_name }
+//             yield skillLoadEvent
+//           }
+//           switch (toolCall.name) {
+//             case "shell": {
+//               promises.push(limit(() => executeToolWithCallId(this.tools.shell.execute, toolCall.arguments, toolCall.id)))
+//               break
+//             }
+//             case "edit":
+//               promises.push(limit(() => executeToolWithCallId(this.tools.edit.execute, toolCall.arguments, toolCall.id)))
+//               break
+//             case "write":
+//               promises.push(limit(() => executeToolWithCallId(this.tools.write.execute, toolCall.arguments, toolCall.id)))
+//               break
+//             case "read":
+//               promises.push(limit(() => executeToolWithCallId(this.tools.read.execute, toolCall.arguments, toolCall.id)))
+//               break
+//             case "skills":
+//               promises.push(limit(() => executeToolWithCallId(this.tools.skills.execute, toolCall.arguments, toolCall.id)))
+//           }
+//         }
+//       }
+//       // to be continued
 
 //     }
 
-//     // to be continued
+//     return
 //   }
 // }

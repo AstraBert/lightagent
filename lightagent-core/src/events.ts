@@ -62,6 +62,8 @@ const AssistantMessagePartSchema = v.union([
   ToolCallPartSchema,
 ]);
 
+export type AssistantMessagePart = v.InferOutput<typeof AssistantMessagePartSchema>
+
 const UsageSchema = v.object({
   latency: v.number(),
   inputTokens: v.number(),
@@ -174,6 +176,28 @@ export const AgentEventSchema = v.union([
   StreamDeltaEventSchema,
 ]);
 export type AgentEvent = v.InferOutput<typeof AgentEventSchema>;
+
+export function messageToAssistantContent(parts: MessagePart[]): AssistantMessagePart[] {
+  const content: AssistantMessagePart[] = []
+
+  for (const part of parts) {
+    switch (part.type) {
+      case "text":
+        content.push({type: "text", text: part.text})
+        break
+      case "thinking":
+        content.push({type: "thinking", thinking: part.thinking, signature: part.signature })
+        break
+      case "toolCall":
+        content.push({type: "toolCall", arguments: part.arguments, id: part.id, name: part.name })
+        break
+      default:
+        continue
+    }
+  }
+
+  return content
+}
 
 /* Convert persisted `AgentEvent`s back into llms-sdk `Message`s.
 Only events that correspond to chat roles (`User`, `Assistant`, `Tool`) are converted. */
