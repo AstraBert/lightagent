@@ -13,6 +13,10 @@ export type Provider = v.InferOutput<typeof ProviderSchema>;
 const DeltaTypeSchema = v.picklist(["text", "thinking"]);
 export type DeltaType = v.InferOutput<typeof DeltaTypeSchema>;
 
+export function isProvider(value: unknown): value is Provider {
+  return v.is(ProviderSchema, value)
+}
+
 export type JsonData =
   | string
   | number
@@ -197,6 +201,76 @@ export function messageToAssistantContent(parts: MessagePart[]): AssistantMessag
   }
 
   return content
+}
+
+const encoder = new TextEncoder();
+
+function addColor(s: string, colorCode: number) {
+  return `\x1b[38;5;${colorCode}m${s}\x1b[1;39m`
+}
+
+async function writeOut(text: string): Promise<number> {
+  return await Deno.stdout.write(encoder.encode(text));
+}
+
+/* Log an event to console, either as human-readable, rich text or JSON lines */
+export async function logEvent(json: boolean, event: AgentEvent, wasThinking: boolean, wasTexting: boolean): Promise<{
+  wasTexting: boolean,
+  wasThinking: boolean
+}> {
+  if (json) {
+    console.log(JSON.stringify(event))
+    return { wasTexting, wasThinking }
+  }
+  switch (event.type) {
+    case "stream.delta": {
+      if (event.deltaType === "text") {
+        wasTexting = true
+        if (wasThinking) {
+          wasThinking = false
+          await writeOut("\n")
+        }
+        await writeOut(event.delta)
+      } else {
+        wasThinking = true
+        if (wasTexting) {
+          wasTexting = false
+          await writeOut("\n")
+        }
+        await writeOut(addColor(event.delta, 253))
+      }
+      break
+    }
+    case "tool.call": {
+      if (wasTexting || wasThinking) {
+        await writeOut("\n")
+      }
+      console.log(`${addColor('Tool Call ' + event.toolCallId, 207)}\nCalling tool ${event.name} with arguments:\n${addColor(JSON.stringify(event.input, undefined, 2), 214)}`)
+      break
+    }
+    case "skill.load": {
+      if (wasTexting || wasThinking) {
+        await writeOut("\n")
+      }
+      console.log(`Loaded skill: ${addColor(event.skillName, 45)}`)
+      break
+    }
+    case "session.init": {
+      console.log(addColor(`Starting session ${event.sessionId}`, 253))
+      break
+    }
+    case "tool.result": {
+      console.log(`${event.result.type === 'success' ? '✓' : '✗'} ${addColor('Tool Result for ' + event.toolCallId, 207)}\n${event.result.type === 'success' ? event.result.result.slice(0, 200) : addColor(event.result.error, 196) }`)
+      break
+    }
+    case "session.stop": {
+      console.log(addColor(`Done. toks in: ${event.usage.inputTokens}; toks out: ${event.usage.outputTokens}; duration: ${event.usage.latency}s`, 253))
+      break
+    }
+    default:
+      break
+  }
+  return { wasTexting, wasThinking }
 }
 
 /* Convert persisted `AgentEvent`s back into llms-sdk `Message`s.
