@@ -14,7 +14,9 @@ import {
   Usage,
   AsyncQueue,
   JsonValue,
-  ToolResult} from "@cle-does-things/lightagent-core";
+  ToolResult,
+  CompactionResultSchema,
+} from "@cle-does-things/lightagent-core";
 import { LocalFileSystem } from "./fs.ts";
 import { getDbPath, LocalSqliteClient } from "./storage.ts";
 import { LocalShell } from "./shell.ts";
@@ -23,6 +25,7 @@ import { toJsonSchema } from "@valibot/to-json-schema";
 import { ApiType, Llm, LlmRequest, Message, MessageRole, textMessage, ToolCallPart } from "@cle-does-things/llms-sdk";
 import { crypto } from "@std/crypto/crypto";
 import pLimit from "p-limit"
+import * as v from "valibot"
 
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1"
@@ -60,6 +63,43 @@ seems compelling enough for the task at hand.
 </tools_and_skills_usage>
 </guidelines>`
 const MAX_CONCURRENT_TOOL_CALLS = 10
+const COMPACTION_SYSTEM_PROMPT = `You are tasked with compacting a conversation between a user and an AI agent. Conversations may often contain a mix of text, thinking and tool calls/results. Your main task is to compact the conversation to its essential parts, capturing its goals, finished/unfinished tasks, key decisions, blockers, potential next steps and, in general, the critical context that should be carried on from the conversation into future ones. Since the AI agent might have access to the filesystem, you might need to include files that the agent accessed and wrote/modified over the course of the conversation. Your task is to be concise but effective, trying to convey the most information density possible. Your compation summaries will be used for retrieval (the agent goes back to past conversations and tries to see if there was anything relevant through natural language queries), so please structure the summaries in such a way that keywords and information density are optimized for a hybrid search pipeline. Follow this template for the final summary:
+\`\`\`md
+  ## Goal
+  [What the user is trying to accomplish]
+
+  ## Constraints & Preferences
+  - [Requirements mentioned by user]
+
+  ## Progress
+  ### Done
+  - [x] [Completed tasks]
+
+  ### In Progress
+  - [ ] [Current work]
+
+  ### Blocked
+  - [Issues, if any]
+
+  ## Key Decisions
+  - **[Decision]**: [Rationale]
+
+  ## Next Steps
+  1. [What should happen next]
+
+  ## Critical Context
+  - [Data needed to continue]
+
+  <read-files>
+  path/to/file1.ts
+  path/to/file2.ts
+  </read-files>
+
+  <modified-files>
+  path/to/changed.ts
+  </modified-files>
+\`\`\`
+`
 
 function resolveCredentials(env: LocalEnvironment, provider?: Provider, apiKey?: string): {provider: Provider, apiKey: string} {
   if (apiKey && provider) {
@@ -307,7 +347,7 @@ export class LocalLightAgent {
       const queue = new AsyncQueue<AgentEvent>()
       let toolCalls: ToolCallPart[] = []
       let assistantMessage: Message | null = null
-      const streamPromise = this.llmClient.streamResponse(request, (err, chunk) => {
+      this.llmClient.streamResponse(request, (err, chunk) => {
         if (err) {
           queue.push({
             chunk: {
@@ -559,4 +599,12 @@ export class LocalLightAgent {
     }
     return
   }
+
+  // private async summarizeAndStore(timestamp: Date) {
+  //   Get all events after timestamp from storage ->
+  //   reconstruct session history ->
+  //   Get the summary for the session ->
+  //   Build summary on top of previous summary + new events ->
+  //   Store new summary
+  // }
 }

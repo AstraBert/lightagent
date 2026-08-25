@@ -1,6 +1,8 @@
 import { LocalLightAgent } from "./agent.ts";
 import { parseArgs } from "@std/cli";
-import { isProvider, Provider, logEvent } from "@cle-does-things/lightagent-core"
+import { isProvider, Provider, EventLogger } from "@cle-does-things/lightagent-core"
+
+const VERSION = "0.1.0"
 
 if (import.meta.main) {
   const cmdOptions = parseArgs(Deno.args, {
@@ -42,18 +44,6 @@ if (import.meta.main) {
     }
   }
 
-  let promptInput: string | null = null;
-  if (cmdOptions.prompt) {
-    promptInput = cmdOptions.prompt
-  } else {
-    promptInput = prompt("What do you want to do today?")
-  }
-
-  if (!promptInput) {
-    console.error("\x1b[1;31mERROR! You need to provide a prompt, either through the `--prompt` flag or through the interactive terminal interface\x1b[1;39m")
-    Deno.exit(1)
-  }
-
   const agent = new LocalLightAgent({
     model: cmdOptions.model,
     summarizingModel: cmdOptions.summarizer,
@@ -67,9 +57,37 @@ if (import.meta.main) {
     autoSkillDiscovery: cmdOptions["discover-skills"],
   })
 
-  let wasTexting = false;
-  let wasThinking = false;
-  for await (const event of agent.run(promptInput, cmdOptions["session-id"])) {
-    ({ wasTexting, wasThinking } = await logEvent(cmdOptions.json, event, wasTexting, wasThinking));
+  const logger = new EventLogger(cmdOptions.json)
+
+  // Headless mode: --prompt provided
+  if (cmdOptions.prompt) {
+    for await (const event of agent.run(cmdOptions.prompt, cmdOptions["session-id"])) {
+      await logger.log(event);
+    }
+    Deno.exit(0)
+  }
+
+  // Interactive CLI mode
+  console.log(`\x1b[1;36mLightAgent v${VERSION}\x1b[0m`)
+  console.log("\x1b[2mType your prompt and press Enter. Use Ctrl+C or type 'exit' to quit.\x1b[0m\n")
+
+  let sessionId: string | undefined = cmdOptions["session-id"];
+
+  while (true) {
+    const promptText = prompt("\x1b[1;32m>\x1b[0m ")
+    if (promptText === null || promptText.trim().toLowerCase() === "exit") {
+      console.log("\x1b[2mGoodbye!\x1b[0m")
+      break
+    }
+    if (!promptText.trim()) continue
+
+    for await (const event of agent.run(promptText, sessionId)) {
+      await logger.log(event)
+      if (event.type === "session.init") {
+        sessionId = event.sessionId;
+      }
+    }
+
+    console.log() // blank line between turns
   }
 }
