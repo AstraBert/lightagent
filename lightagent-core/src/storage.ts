@@ -43,7 +43,7 @@ export class AgentStorage {
     this.initialized = false;
   }
 
-  private async initStorage(): Promise<void> {
+  async initStorage(): Promise<void> {
     if (!this.initialized) {
       await applyMigrations(this.db, this.fs);
       this.initialized = true;
@@ -60,6 +60,38 @@ export class AgentStorage {
         createdAt: Number(event.timestamp),
       },
     );
+  }
+
+  async getSessionSummary(sessionId: string): Promise<{summary: string, title: string, updated_at: Date} | undefined> {
+    await this.initStorage()
+    const stmt = await this.db.prepare<{summary: string, title: string, updated_at: Date}>(
+      "select summary, title, updated_at from session_summaries where session_id = :sessionId"
+    )
+    const returned = stmt.get({ sessionId })
+    return returned
+  }
+
+  async setSessionSummary(sessionId: string, summary: string, title: string): Promise<void> {
+    await this.initStorage()
+    await this.db.exec("insert into session_summaries (session_id, summary, title, updated_at) VALUES (:sessionId, :summary, :title, :updatedAt)", {
+      sessionId,
+      summary,
+      title,
+      updatedAt: Number(new Date())
+    })
+  }
+
+  async updateSessionSummary(sessionId: string, summary: string, title: string): Promise<void> {
+    await this.initStorage()
+    await this.db.exec(
+      "update session_summaries set summary = :summary, title = :title, updated_at = :updatedAt where session_id = :sessionId",
+      {
+        sessionId,
+        summary,
+        title,
+        updatedAt: Number(new Date())
+      }
+    )
   }
 
   async getSessionEvents(sessionId: string): Promise<AgentEvent[]> {

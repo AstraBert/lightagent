@@ -237,6 +237,10 @@ export class LocalLightAgent {
     this.resolvedSystem = true
   }
 
+  async checkForMigrations(): Promise<void> {
+    await this.storage.initStorage()
+  }
+
   private async resolvePrompt(prompt: string) {
     if (prompt.startsWith("/")) {
       const skillName = prompt.split(" ")[0]!.slice(1)
@@ -600,11 +604,23 @@ export class LocalLightAgent {
     return
   }
 
-  // private async summarizeAndStore(timestamp: Date) {
-  //   Get all events after timestamp from storage ->
-  //   reconstruct session history ->
-  //   Get the summary for the session ->
-  //   Build summary on top of previous summary + new events ->
-  //   Store new summary
-  // }
+  private async summarizeAndStore(sessionId: string, timestamp: Date) {
+    // Get all events after timestamp from storage ->
+    // reconstruct session history ->
+    // Get the summary for the session ->
+    // Build summary on top of previous summary + new events ->
+    // Store new summary
+    try {
+      const existing = await this.storage.getSessionSummary(sessionId)
+      let messages: Message[] = []
+      if (!existing) {
+        messages = this.history.filter((m) => m.role !== "system")
+      } else {
+        const base = textMessage(`Summary of the previous checkpoint for session titled ${existing.summary}\n\n${existing.summary}`, "user" as MessageRole)
+      }
+
+    } catch {
+      return
+    }
+  }
 }

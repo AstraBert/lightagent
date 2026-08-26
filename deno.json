@@ -8,5 +8,8 @@
     "p-limit": "npm:p-limit@^7.3.1",
     "valibot": "npm:valibot@^1.4.2"
   },
+  "tasks": {
+    "new-migration": "./scripts/generate-migration.py"
+  },
   "nodeModulesDir": "auto"
 }

@@ -10,7 +10,7 @@ from pathlib import Path
 
 @lru_cache(maxsize=1)
 def get_migrations_dir() -> Path:
-    return Path(__file__).parents[1] / "src" / "storage" / "migrations"
+    return Path(__file__).parents[1] / "lightagent-core" / "src" / "migrations"
 
 
 def assign_migration_name(directory: Path, name: str) -> str:

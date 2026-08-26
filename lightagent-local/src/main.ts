@@ -57,6 +57,8 @@ if (import.meta.main) {
     autoSkillDiscovery: cmdOptions["discover-skills"],
   })
 
+  await agent.checkForMigrations()
+
   const logger = new EventLogger(cmdOptions.json)
 
   // Headless mode: --prompt provided
