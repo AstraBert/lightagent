@@ -5,6 +5,7 @@ import {
   type MessageRole,
   textMessage,
 } from "@cle-does-things/llms-sdk";
+import { error } from "node:console";
 
 const SessionInitTypeSchema = v.picklist(["new", "resume"]);
 export type SessionInitType = v.InferOutput<typeof SessionInitTypeSchema>
@@ -173,6 +174,15 @@ const AssistantResponseEventSchema = v.object({
   timestamp: v.date(),
 });
 
+const MemoryStorageEventSchema = v.object({
+  type: v.literal("memory.storage"),
+  sessionId: v.string(),
+  timestamp: v.date(),
+  success: v.boolean(),
+  error: v.optional(v.string()),
+})
+export type MemoryStorageEvent = v.InferOutput<typeof MemoryStorageEventSchema>
+
 export const AgentEventSchema = v.union([
   SessionInitEventSchema,
   SessionStopEventSchema,
@@ -183,6 +193,7 @@ export const AgentEventSchema = v.union([
   AssistantResponseEventSchema,
   ToolResultEventSchema,
   StreamDeltaEventSchema,
+  MemoryStorageEventSchema,
 ]);
 export type AgentEvent = v.InferOutput<typeof AgentEventSchema>;
 
@@ -206,6 +217,27 @@ export function messageToAssistantContent(parts: MessagePart[]): AssistantMessag
   }
 
   return content
+}
+
+export function assistantContentToMessage(content: AssistantMessagePart[]): Message {
+  const parts: MessagePart[] = []
+  for (const c of content) {
+    switch (c.type) {
+      case "text":
+        parts.push({type: "text", text: c.text})
+        break
+      case "thinking":
+        parts.push({type: "thinking", thinking: c.thinking, signature: c.signature})
+        break
+      case "toolCall":
+        parts.push({type: "toolCall", arguments: c.arguments, id: c.id, name: c.name})
+        break
+    }
+  }
+  return {
+    role: "assistant" as MessageRole,
+    content: parts,
+  }
 }
 
 /* Convert persisted `AgentEvent`s back into llms-sdk `Message`s.

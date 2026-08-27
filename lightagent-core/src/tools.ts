@@ -7,6 +7,7 @@ import type { SkillsClient } from "./skills.ts";
 import { assertFileWithinWorkspace, assertUniqueString } from "./assertions.ts";
 import type { FileSystem } from "./fs.ts";
 import type { Shell } from "./shell.ts";
+import type { AgentStorage } from "./storage.ts";
 
 type ToolParametersSchema = v.ObjectSchema<
   v.ObjectEntries,
@@ -227,6 +228,34 @@ export class ShellTool extends ToolFunction<Shell> {
         type: "error",
         error: `An error occurred while executing the \`shell\` tool: ${e}`,
       };
+    }
+  }
+}
+
+export class MemoryTool extends ToolFunction<AgentStorage> {
+  readonly name: string = "memory";
+  readonly description: string =
+    "Query your memory to get hints from past interactions";
+  readonly inputSchema = v.object({
+    query: v.pipe(v.string(), v.description("Query to search for within your memory. Better if keyword-heavy.")),
+    limit: v.pipe(v.optional(v.number()), v.description("Maximum number of memories to retrieve. Defaults to 5."))
+  })
+
+  constructor(ctx: AgentStorage) {
+    super(ctx)
+  }
+
+  override async execute(input: JsonValue): Promise<ToolResult> {
+    try {
+      const validated = v.parse(this.inputSchema, input)
+      const results = await this.ctx.querySessionSummaries(validated.query, validated.limit ?? 5)
+      let textResult = ""
+      for (const r of results) {
+        textResult += `## Session ${r.sessionId}: ${r.title}\n\n${r.snippets.join('\n\n')}\n\n`
+      }
+      return { type: "success", result: textResult }
+    } catch (e) {
+      return { type: "error", error: `An error occurred while executing the 'memory' tool: ${e}`}
     }
   }
 }

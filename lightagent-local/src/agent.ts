@@ -3,6 +3,7 @@ import {
   AgentStorage,
   convertEventsToMessages,
   messageToAssistantContent,
+  assistantContentToMessage,
   EditTool,
   Provider,
   ReadTool,
@@ -16,6 +17,8 @@ import {
   JsonValue,
   ToolResult,
   CompactionResultSchema,
+  MemoryStorageEvent,
+  MemoryTool,
 } from "@cle-does-things/lightagent-core";
 import { LocalFileSystem } from "./fs.ts";
 import { getDbPath, LocalSqliteClient } from "./storage.ts";
@@ -101,6 +104,8 @@ const COMPACTION_SYSTEM_PROMPT = `You are tasked with compacting a conversation 
 \`\`\`
 `
 
+const DEFAULT_SUMMARIZATION_BUDGET = 32_000;
+
 function resolveCredentials(env: LocalEnvironment, provider?: Provider, apiKey?: string): {provider: Provider, apiKey: string} {
   if (apiKey && provider) {
     return { provider, apiKey }
@@ -146,6 +151,7 @@ export class LocalLightAgent {
   skillsList: string[]
   promptCaching: boolean
   parallelToolCalls: boolean
+  summarizationBudget: number = DEFAULT_SUMMARIZATION_BUDGET
   private llmClient: Llm = new Llm()
   private history: Message[] = []
   private env: LocalEnvironment = new LocalEnvironment()
@@ -161,6 +167,7 @@ export class LocalLightAgent {
     write: WriteTool,
     read: ReadTool,
     skills: SkillsTool,
+    memory: MemoryTool,
   }
   private resolvedSkills: boolean = false
   private resolvedSystem: boolean = false
@@ -176,6 +183,7 @@ export class LocalLightAgent {
     skillsList?: string[],
     promptCaching?: boolean,
     parallelToolCalls?: boolean,
+    summarizationBudget?: number,
   }) {
     this.model = options.model
     const { provider, apiKey } = resolveCredentials(this.env, options.provider, options.apiKey)
@@ -188,6 +196,9 @@ export class LocalLightAgent {
     this.system = options.system ? options.system.append ? `${DEFAULT_SYSTEM_PROMPT}\n\n${options.system.content}` : options.system.content : DEFAULT_SYSTEM_PROMPT
     this.promptCaching = options.promptCaching ?? true
     this.parallelToolCalls = options.parallelToolCalls ?? false
+    if (typeof options.summarizationBudget !== "undefined") {
+      this.summarizationBudget = options.summarizationBudget
+    }
     this.db = new LocalSqliteClient(getDbPath(this.fs))
     this.storage = new AgentStorage(this.db, this.fs)
     this.skillsClient = new SkillsClient(this.fs)
@@ -196,7 +207,8 @@ export class LocalLightAgent {
       read: new ReadTool(this.fs),
       write: new WriteTool(this.fs),
       skills: new SkillsTool(this.skillsClient),
-      shell: new ShellTool(this.shell)
+      shell: new ShellTool(this.shell),
+      memory: new MemoryTool(this.storage)
     }
   }
 
@@ -484,6 +496,7 @@ export class LocalLightAgent {
       }
 
       if (toolCalls.length === 0) {
+        await this.summarizeAndStore(resolvedSid)
         const stopEvent: AgentEvent = {
           type: "session.stop",
           timestamp: new Date(),
@@ -599,28 +612,73 @@ export class LocalLightAgent {
           }]
         })
       }
-      // now back to the top
     }
     return
   }
 
-  private async summarizeAndStore(sessionId: string, timestamp: Date) {
-    // Get all events after timestamp from storage ->
-    // reconstruct session history ->
-    // Get the summary for the session ->
-    // Build summary on top of previous summary + new events ->
-    // Store new summary
+  private async summarizeAndStore(sessionId: string): Promise<MemoryStorageEvent> {
     try {
       const existing = await this.storage.getSessionSummary(sessionId)
       let messages: Message[] = []
+      let shouldUpdate = false
       if (!existing) {
         messages = this.history.filter((m) => m.role !== "system")
       } else {
-        const base = textMessage(`Summary of the previous checkpoint for session titled ${existing.summary}\n\n${existing.summary}`, "user" as MessageRole)
+        shouldUpdate = true
+        const base = textMessage(`Summary of the previous checkpoint for session titled ${existing.title}\n\n${existing.summary}`, "user" as MessageRole)
+        const events = await this.storage.getSessionEvents(sessionId, existing.updated_at)
+        const filtered = events.filter((e) => e.type === "user.prompt_submit" || e.type === "assistant.response" || e.type === "tool.result")
+        messages = filtered.map((e) => {
+          switch (e.type) {
+            case "assistant.response":
+              return assistantContentToMessage(e.content)
+            case "user.prompt_submit":
+              return textMessage(e.prompt)
+            case "tool.result":
+              return {
+                role: "tool" as MessageRole,
+                content: [
+                  {
+                    type: "toolResult",
+                    result: e.result.type === "success" ? e.result.result : `An error occurred: ${e.result.error}`,
+                    toolCallId: e.toolCallId
+                  }
+                ]
+              } as Message
+          }
+        })
+        messages = [base, ...messages]
       }
-
-    } catch {
-      return
+      messages = [textMessage(COMPACTION_SYSTEM_PROMPT, "system" as MessageRole), ...messages]
+      const request = {
+        apiType: this.provider,
+        apiKey: this.apiKey,
+        model: this.summarizingModel,
+        messages,
+        stream: false,
+        parallelToolCalls: false,
+        maxOutputTokens: this.summarizationBudget,
+        outputFormat: {
+          name: "summary",
+          description: "Summary of the current session, based on the provided messages",
+          schema: toJsonSchema(CompactionResultSchema),
+        }
+      } as LlmRequest;
+      const llm = new Llm()
+      const response = await llm.respond(request)
+      const responseText = response.message.content.filter((c) => c.type === "text")[0]
+      if (!responseText) {
+        return { sessionId, success: false, timestamp: new Date(), type: "memory.storage", error: "Summarization model did not produce any summary" }
+      }
+      const validated = await v.parseAsync(CompactionResultSchema, JSON.parse(responseText.text))
+      if (shouldUpdate) {
+        await this.storage.updateSessionSummary(sessionId, validated.summary, validated.title)
+      } else {
+        await this.storage.setSessionSummary(sessionId, validated.summary, validated.title)
+      }
+      return { sessionId, success: true, timestamp: new Date(), type: "memory.storage" }
+    } catch (e) {
+      return { sessionId, success: false, timestamp: new Date(), type: "memory.storage", error: `An error occurred: ${e}` }
     }
   }
 }

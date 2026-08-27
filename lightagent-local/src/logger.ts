@@ -1,4 +1,4 @@
-import type { AgentEvent } from "./events.ts";
+import type { AgentEvent } from "@cle-does-things/lightagent-core";
 
 const encoder = new TextEncoder();
 
@@ -64,6 +64,13 @@ export class EventLogger {
         );
         await writeOut("\n")
         break;
+      }
+      case "memory.storage": {
+        if (event.error) {
+          await writeOut("\n")
+          await writeLine(`${addColor("\WARNING!", 220)} Could not store the summary of the current session, memories will be out of sync`)
+        }
+        break
       }
       case "session.stop":
         await writeOut("\n")

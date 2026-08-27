@@ -62,9 +62,9 @@ export class AgentStorage {
     );
   }
 
-  async getSessionSummary(sessionId: string): Promise<{summary: string, title: string, updated_at: Date} | undefined> {
+  async getSessionSummary(sessionId: string): Promise<{summary: string, title: string, updated_at: number} | undefined> {
     await this.initStorage()
-    const stmt = await this.db.prepare<{summary: string, title: string, updated_at: Date}>(
+    const stmt = await this.db.prepare<{summary: string, title: string, updated_at: number}>(
       "select summary, title, updated_at from session_summaries where session_id = :sessionId"
     )
     const returned = stmt.get({ sessionId })
@@ -94,12 +94,29 @@ export class AgentStorage {
     )
   }
 
-  async getSessionEvents(sessionId: string): Promise<AgentEvent[]> {
+  async querySessionSummaries(query: string, limit: number): Promise<{title: string, sessionId: string, snippets: string[]}[]> {
+    await this.initStorage()
+    const stmt = await this.db.prepare<{session_id: string, title: string, summary: string}>("select session_id, title, highlight(summary, 2, '<snippet>', '</snippet>') from session_summaries(:query) limit :limit order by rank")
+    const results = stmt.all({query, limit})
+    const snippetRegex = /<snippet>(.*?)<\/snippet>/g;
+    const withSnippets = results.map(row => ({
+        sessionId: row.session_id,
+        title: row.title,
+        snippets: [...row.summary.matchAll(snippetRegex)].map(m => m[1])
+    }));
+    return withSnippets
+  }
+
+  async getSessionEvents(sessionId: string, afterTimestamp?: number): Promise<AgentEvent[]> {
     await this.initStorage();
-    const stmt = await this.db.prepare<{ payload: string }>(
-      "select payload from events where session_id = :sessionId order by id, created_at",
-    );
-    const events = stmt.all({ sessionId });
+    let sql = "select payload from events where session_id = :sessionId order by id, created_at"
+    let params: Record<string, string | number> = { sessionId }
+    if (afterTimestamp) {
+      sql = "select payload from events where session_id = :sessionId and created_at > :timestamp order by id, created_at"
+      params = { sessionId, timestamp: afterTimestamp }
+    }
+    const stmt = await this.db.prepare<{ payload: string }>(sql);
+    const events = stmt.all(params);
     const agentEvents: AgentEvent[] = [];
     for (const event of events) {
       const data = JSON.parse(event.payload);

@@ -1,6 +1,7 @@
 import { LocalLightAgent } from "./agent.ts";
+import { EventLogger } from "./logger.ts";
 import { parseArgs } from "@std/cli";
-import { isProvider, Provider, EventLogger } from "@cle-does-things/lightagent-core"
+import { isProvider, Provider } from "@cle-does-things/lightagent-core"
 
 const VERSION = "0.1.0"
 
