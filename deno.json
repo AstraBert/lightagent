@@ -10,6 +10,5 @@
   },
   "tasks": {
     "new-migration": "./scripts/generate-migration.py"
-  },
-  "nodeModulesDir": "auto"
+  }
 }

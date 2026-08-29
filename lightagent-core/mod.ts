@@ -5,7 +5,7 @@ export * from "./src/shell.ts";
 export * from "./src/skills.ts";
 export * from "./src/storage.ts";
 export * from "./src/tools.ts";
-export * from "./src/migrations.ts";
+export * from "./src/apply-migrations.ts";
 export * from "./src/environment.ts";
 export * from "./src/queue.ts";
 export * from "./src/mcp.ts";

@@ -1,7 +1,6 @@
 import { type AgentEvent, AgentEventSchema } from "./events.ts";
 import * as v from "valibot";
-import type { FileSystem } from "./fs.ts";
-import { applyMigrations } from "./migrations.ts";
+import { applyMigrations } from "./apply-migrations.ts";
 
 export type SqlBindValue =
   | number
@@ -21,9 +20,9 @@ export type SqlBindParameters = SqlBindValue[] | [SqlBindParameters];
 /* SQL statement, resulting from a `prepare` operation */
 export interface SqlStatement<T> {
   /* Fetch all records associated with the statement */
-  all(...parameters: SqlBindParameters): T[];
+  all(...parameters: SqlBindParameters): Promise<T[]>;
   /* Fetch the first record associated with the statement, if any */
-  get(...parameters: SqlBindParameters): T | undefined;
+  get(...parameters: SqlBindParameters): Promise<T | undefined>;
 }
 
 export interface SqliteClient {
@@ -34,19 +33,17 @@ export interface SqliteClient {
 }
 
 export class AgentStorage {
-  private fs: FileSystem;
   private db: SqliteClient;
   private initialized: boolean;
 
-  constructor(db: SqliteClient, fs: FileSystem) {
+  constructor(db: SqliteClient) {
     this.db = db;
-    this.fs = fs;
     this.initialized = false;
   }
 
   async initStorage(): Promise<void> {
     if (!this.initialized) {
-      await applyMigrations(this.db, this.fs);
+      await applyMigrations(this.db);
       this.initialized = true;
     }
   }
@@ -77,7 +74,7 @@ export class AgentStorage {
       params = { sessionId, timestamp: afterTimestamp };
     }
     const stmt = await this.db.prepare<{ payload: string }>(sql);
-    const events = stmt.all(params);
+    const events = await stmt.all(params);
     const agentEvents: AgentEvent[] = [];
     for (const event of events) {
       const data = JSON.parse(event.payload, (key, value) => {

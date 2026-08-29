@@ -1,37 +1,19 @@
-import type { FileSystem } from "./fs.ts";
 import type { SqliteClient } from "./storage.ts";
-import * as path from "@std/path";
+import { migrations } from "./migrations/mod.ts";
 
-async function getMigrations(
-  fs: FileSystem,
-): Promise<{ version: number; sql: string }[]> {
-  const migrations: { version: number; sql: string }[] = [];
-  const migrationsDir = path.fromFileUrl(
-    new URL("./migrations", import.meta.url),
-  );
-  for await (const entry of fs.readDir(migrationsDir)) {
-    if (entry.name.endsWith(".sql")) {
-      const sql = await fs.readToString(path.join(migrationsDir, entry.name));
-      const version = parseInt(entry.name.split("_")[0]!);
-      migrations.push({ sql, version });
-    }
-  }
-  migrations.sort((m, n) => m.version - n.version);
-  return migrations;
-}
 
 async function getCurrentMigration(db: SqliteClient): Promise<number> {
   const stmt = await db.prepare(
     "select name from sqlite_master where type='table' and name='_migrations'",
   );
-  const exists = stmt.get();
+  const exists = await stmt.get();
   if (typeof exists === "undefined") {
     return 0;
   }
   const versionStmt = await db.prepare<{ version: number; applied_at: number }>(
     "select version, applied_at from _migrations order by applied_at desc, version desc",
   );
-  const version = versionStmt.get();
+  const version = await versionStmt.get();
   if (typeof version === "undefined") {
     return 0;
   }
@@ -40,9 +22,7 @@ async function getCurrentMigration(db: SqliteClient): Promise<number> {
 
 export async function applyMigrations(
   db: SqliteClient,
-  fs: FileSystem,
 ): Promise<void> {
-  const migrations = await getMigrations(fs);
   const currentVersion = await getCurrentMigration(db);
   const toApply = migrations.filter((m) => m.version > currentVersion);
   for (const m of toApply) {

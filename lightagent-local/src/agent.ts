@@ -165,12 +165,12 @@ export class LocalLightAgent {
     );
     this.provider = provider;
     this.apiKey = apiKey;
-    this.baseUrl = options.baseUrl ?? provider == "openai"
+    this.baseUrl = options.baseUrl ?? (provider == "openai"
       ? DEFAULT_OPENAI_BASE_URL
-      : DEFAULT_ANTHROPIC_BASE_URL;
-    this.autoSkillDiscovery = options.autoSkillDiscovery ?? options.skillsList
+      : DEFAULT_ANTHROPIC_BASE_URL);
+    this.autoSkillDiscovery = options.autoSkillDiscovery ?? (options.skillsList
       ? false
-      : true;
+      : true);
     this.skillsList = options.skillsList ?? [];
     this.system = options.system
       ? options.system.append
@@ -180,7 +180,7 @@ export class LocalLightAgent {
     this.promptCaching = options.promptCaching ?? true;
     this.parallelToolCalls = options.parallelToolCalls ?? false;
     this.db = new LocalSqliteClient(getDbPath(this.fs));
-    this.storage = new AgentStorage(this.db, this.fs);
+    this.storage = new AgentStorage(this.db);
     this.skillsClient = new SkillsClient(this.fs);
     this.tools = {
       edit: new EditTool(this.fs),

@@ -16,11 +16,13 @@ export class LocalSqlStatement<T extends object> implements SqlStatement<T> {
     this.base = base;
   }
 
-  all(...parameters: SqlBindParameters): T[] {
+  // deno-lint-ignore require-await
+  async all(...parameters: SqlBindParameters): Promise<T[]> {
     return this.base.all(...parameters);
   }
 
-  get(...parameters: SqlBindParameters): T | undefined {
+  // deno-lint-ignore require-await
+  async get(...parameters: SqlBindParameters): Promise<T | undefined> {
     return this.base.get(...parameters);
   }
 }

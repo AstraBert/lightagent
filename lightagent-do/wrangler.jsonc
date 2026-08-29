@@ -1,0 +1,15 @@
+{
+  "name": "lightagent-do",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-01-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lightagent-sessions",
+      "database_id": "94bebeda-0db8-45b5-aa52-d9517dba56d4"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "FS", "bucket_name": "filesystem" }
+  ]
+}

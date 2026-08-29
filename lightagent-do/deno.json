@@ -3,6 +3,9 @@
     "dev": "deno run --watch --allow-net main.ts"
   },
   "imports": {
-    "@std/assert": "jsr:@std/assert@1"
+    "@cloudflare/workers-types": "npm:@cloudflare/workers-types@^5.20260828.1"
+  },
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types"]
   }
 }

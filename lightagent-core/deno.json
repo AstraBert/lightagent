@@ -6,10 +6,5 @@
     "@mcp-use/client": "npm:@mcp-use/client@^2.2.1",
     "@std/assert": "jsr:@std/assert@1",
     "@std/front-matter": "jsr:@std/front-matter@^1.0.9"
-  },
-  "compile": {
-    "include": [
-      "src/migrations"
-    ]
   }
 }

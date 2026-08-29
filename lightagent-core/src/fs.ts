@@ -40,7 +40,7 @@ export class FileNotFoundError extends Error {
 }
 
 export interface FileSystem {
-  env: Environment;
+  env: Environment | undefined;
   readToString: (path: string) => Promise<string>;
   readDir: (path: string) => AsyncIterable<DirEntry>;
   write: (path: string, content: string) => Promise<void>;

@@ -21,6 +21,7 @@
     "jsr:@std/toml@^1.0.3": "1.0.11",
     "jsr:@std/yaml@^1.0.5": "1.2.0",
     "npm:@cle-does-things/llms-sdk@~0.2.3": "0.2.3",
+    "npm:@cloudflare/workers-types@^5.20260828.1": "5.20260828.1",
     "npm:@mcp-use/client@^2.2.1": "2.2.1_zod@4.4.3",
     "npm:@valibot/to-json-schema@^1.7.1": "1.7.1_valibot@1.4.2__typescript@5.9.3_typescript@5.9.3",
     "npm:p-limit@^7.3.1": "7.3.1",
@@ -157,6 +158,9 @@
         "@cle-does-things/llms-sdk-win32-arm64-msvc",
         "@cle-does-things/llms-sdk-win32-x64-msvc"
       ]
+    },
+    "@cloudflare/workers-types@5.20260828.1": {
+      "integrity": "sha512-Ce0QfghuAK9v821gER8rFPR3rMeC+5puTgTzCu4UrG1Zg967Z5Aa+2uZVciIyfCAdGssyh+sLEC6rMjN/YBQwA=="
     },
     "@mcp-use/client@2.2.1_zod@4.4.3": {
       "integrity": "sha512-hAiSubrzTBzlj7Bd4kqL1LLAa/1B8q5iFLYp0Gmn0Cv3IKPNsXU+NfRHcaBQ2IZoCVRzHbeIUZiGksBIt9Mu3w==",
@@ -296,7 +300,7 @@
       },
       "lightagent-do": {
         "dependencies": [
-          "jsr:@std/assert@1"
+          "npm:@cloudflare/workers-types@^5.20260828.1"
         ]
       },
       "lightagent-local": {
