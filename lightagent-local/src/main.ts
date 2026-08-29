@@ -1,13 +1,14 @@
 import { LocalLightAgent } from "./agent.ts";
 import { EventLogger } from "./logger.ts";
 import { parseArgs } from "@std/cli";
-import { isProvider, Provider } from "@cle-does-things/lightagent-core"
+import { isProvider, Provider, McpServersDefinitionSchema, McpServer } from "@cle-does-things/lightagent-core"
+import * as v from "valibot"
 
 const VERSION = "0.1.0"
 
 if (import.meta.main) {
   const cmdOptions = parseArgs(Deno.args, {
-    string: ["model", "provider", "api-key", "base-url", "summarizer", "system", "prompt", "session-id", "skill" ],
+    string: ["model", "provider", "api-key", "base-url", "system", "prompt", "session-id", "skill", "mcps-file" ],
     boolean: ["parallel-tool-calls", "append-system", "prompt-caching", "discover-skills", "json"],
     negatable: ["prompt-caching", "discover-skills"],
     collect: ["skill"],
@@ -15,13 +16,13 @@ if (import.meta.main) {
       provider: undefined,
       "api-key": undefined,
       "base-url": undefined,
-      summarizer: undefined,
       system: undefined,
       "parallel-tool-calls": false,
       "append-system": false,
       "prompt-caching": true,
       skill: undefined,
       prompt: undefined,
+      "mcps-file": undefined,
       "session-id": undefined,
       "discover-skills": true,
       json: false,
@@ -37,6 +38,12 @@ if (import.meta.main) {
   if (cmdOptions.system) {
     system = { content: cmdOptions.system, append: cmdOptions["append-system"] }
   }
+  let mcpServers: Record<string, McpServer> | undefined = undefined
+  if (cmdOptions["mcps-file"]) {
+    const content = await Deno.readTextFile(cmdOptions["mcps-file"])
+    const servers = v.parse(McpServersDefinitionSchema, JSON.parse(content))
+    mcpServers = servers.mcpServers
+  }
 
   if (cmdOptions.provider) {
     if (!isProvider(cmdOptions.provider)) {
@@ -47,7 +54,7 @@ if (import.meta.main) {
 
   const agent = new LocalLightAgent({
     model: cmdOptions.model,
-    summarizingModel: cmdOptions.summarizer,
+    mcpServers,
     system,
     skillsList: cmdOptions.skill,
     apiKey: cmdOptions["api-key"],

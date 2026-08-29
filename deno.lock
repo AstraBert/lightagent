@@ -21,6 +21,7 @@
     "jsr:@std/toml@^1.0.3": "1.0.11",
     "jsr:@std/yaml@^1.0.5": "1.2.0",
     "npm:@cle-does-things/llms-sdk@~0.2.3": "0.2.3",
+    "npm:@mcp-use/client@^2.2.1": "2.2.1_zod@4.4.3",
     "npm:@valibot/to-json-schema@^1.7.1": "1.7.1_valibot@1.4.2__typescript@5.9.3_typescript@5.9.3",
     "npm:p-limit@^7.3.1": "7.3.1",
     "npm:valibot@^1.4.2": "1.4.2_typescript@5.9.3"
@@ -157,17 +158,97 @@
         "@cle-does-things/llms-sdk-win32-x64-msvc"
       ]
     },
+    "@mcp-use/client@2.2.1_zod@4.4.3": {
+      "integrity": "sha512-hAiSubrzTBzlj7Bd4kqL1LLAa/1B8q5iFLYp0Gmn0Cv3IKPNsXU+NfRHcaBQ2IZoCVRzHbeIUZiGksBIt9Mu3w==",
+      "dependencies": [
+        "@modelcontextprotocol/client",
+        "@modelcontextprotocol/core",
+        "@modelcontextprotocol/ext-apps@npm:@mcp-use/ext-apps@1.7.4-pr720.1_@modelcontextprotocol+client@2.0.0_@modelcontextprotocol+core@2.0.0_zod@4.4.3",
+        "zod"
+      ]
+    },
+    "@mcp-use/ext-apps@1.7.4-pr720.1_@modelcontextprotocol+client@2.0.0_@modelcontextprotocol+core@2.0.0_zod@4.4.3": {
+      "integrity": "sha512-op0LJm6N9Npt8GQaZ2dF3WwdldvYCw7skD1lRnAOXqpUbyKGiM1l3eMHsJiEE1KRSNLNBYVZrODRG0q38W09iw==",
+      "dependencies": [
+        "@modelcontextprotocol/client",
+        "@modelcontextprotocol/core",
+        "@standard-schema/spec",
+        "zod"
+      ],
+      "optionalPeers": [
+        "@modelcontextprotocol/client"
+      ]
+    },
+    "@modelcontextprotocol/client@2.0.0": {
+      "integrity": "sha512-8f1OghQ2rjzIOfqgUCP+8GiUWqRs89njoWLNqAe8kWmDePv3s1fZXseej+QXemssEuuOvLLmLO/kqM3IQHtISw==",
+      "dependencies": [
+        "@modelcontextprotocol/core",
+        "cross-spawn",
+        "eventsource",
+        "eventsource-parser",
+        "jose",
+        "pkce-challenge",
+        "zod"
+      ]
+    },
+    "@modelcontextprotocol/core@2.0.0": {
+      "integrity": "sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA==",
+      "dependencies": [
+        "zod"
+      ]
+    },
+    "@standard-schema/spec@1.1.0": {
+      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="
+    },
     "@valibot/to-json-schema@1.7.1_valibot@1.4.2__typescript@5.9.3_typescript@5.9.3": {
       "integrity": "sha512-3qkmU6KXWh8GIThEAW3kuRHPQBMjWkKy+Ppz3WkUucx53DTpOa6siMn4xDGSOhlVyMrDaJTCTMLYPZVAIk1P0A==",
       "dependencies": [
         "valibot"
       ]
     },
+    "cross-spawn@7.0.6": {
+      "integrity": "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==",
+      "dependencies": [
+        "path-key",
+        "shebang-command",
+        "which"
+      ]
+    },
+    "eventsource-parser@3.1.1": {
+      "integrity": "sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ=="
+    },
+    "eventsource@3.0.7": {
+      "integrity": "sha512-CRT1WTyuQoD771GW56XEZFQ/ZoSfWid1alKGDYMmkt2yl8UXrVR4pspqWNEcqKvVIzg6PAltWjxcSSPrboA4iA==",
+      "dependencies": [
+        "eventsource-parser"
+      ]
+    },
+    "isexe@2.0.0": {
+      "integrity": "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw=="
+    },
+    "jose@6.2.10": {
+      "integrity": "sha512-iiW7J9qRFlGxvCOIBDBDxFePQSn7ZMAnrYGhrrOo6siO/MIqwfyilLR27pkfDgUk+raLuzADS8A3S/KLBisc0g=="
+    },
     "p-limit@7.3.1": {
       "integrity": "sha512-0trZaiG7Y7kN/Egy9a8j47t9osC0Tch4PaIWd9yGF6bvmlk7muExRvGNYb8sXBwEKMoNKsbNN9P8EefuQekE4Q==",
       "dependencies": [
         "yocto-queue"
       ]
+    },
+    "path-key@3.1.1": {
+      "integrity": "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q=="
+    },
+    "pkce-challenge@5.0.1": {
+      "integrity": "sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ=="
+    },
+    "shebang-command@2.0.0": {
+      "integrity": "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==",
+      "dependencies": [
+        "shebang-regex"
+      ]
+    },
+    "shebang-regex@3.0.0": {
+      "integrity": "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A=="
     },
     "typescript@5.9.3": {
       "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
@@ -182,8 +263,18 @@
         "typescript"
       ]
     },
+    "which@2.0.2": {
+      "integrity": "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==",
+      "dependencies": [
+        "isexe"
+      ],
+      "bin": true
+    },
     "yocto-queue@1.2.2": {
       "integrity": "sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ=="
+    },
+    "zod@4.4.3": {
+      "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="
     }
   },
   "workspace": {
@@ -199,7 +290,8 @@
       "lightagent-core": {
         "dependencies": [
           "jsr:@std/assert@1",
-          "jsr:@std/front-matter@^1.0.9"
+          "jsr:@std/front-matter@^1.0.9",
+          "npm:@mcp-use/client@^2.2.1"
         ]
       },
       "lightagent-do": {

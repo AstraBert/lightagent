@@ -7,7 +7,7 @@ import type { SkillsClient } from "./skills.ts";
 import { assertFileWithinWorkspace, assertUniqueString } from "./assertions.ts";
 import type { FileSystem } from "./fs.ts";
 import type { Shell } from "./shell.ts";
-import type { AgentStorage } from "./storage.ts";
+import type { McpClient } from "./mcp.ts";
 
 type ToolParametersSchema = v.ObjectSchema<
   v.ObjectEntries,
@@ -232,30 +232,49 @@ export class ShellTool extends ToolFunction<Shell> {
   }
 }
 
-export class MemoryTool extends ToolFunction<AgentStorage> {
-  readonly name: string = "memory";
+export class McpTool extends ToolFunction<McpClient> {
+  readonly name: string = "mcp";
   readonly description: string =
-    "Query your memory to get hints from past interactions";
+    "Discover local and remote MCP servers, and call their tools";
   readonly inputSchema = v.object({
-    query: v.pipe(v.string(), v.description("Query to search for within your memory. Better if keyword-heavy.")),
-    limit: v.pipe(v.optional(v.number()), v.description("Maximum number of memories to retrieve. Defaults to 5."))
+    list: v.pipe(v.optional(v.object({})), v.description("List all available servers")),
+    tools: v.pipe(v.optional(v.object({
+      serverNames: v.pipe(v.optional(v.array(v.string())), v.description("Names of the servers whose tools should be listed. If not provided, lists tools from all servers."))
+    })), v.description("List the tools of one of all servers")),
+    call: v.pipe(v.optional(v.object({
+      serverName: v.pipe(v.string(), v.description("Name of the server the tool belongs to")),
+      toolName: v.pipe(v.string(), v.description("Name of the tool to call")),
+      toolInput: v.pipe(v.string(), v.description("Stringified representation of the tool JSON input"))
+    })))
   })
 
-  constructor(ctx: AgentStorage) {
+  constructor(ctx: McpClient) {
     super(ctx)
   }
 
-  override async execute(input: JsonValue): Promise<ToolResult> {
+  async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input)
-      const results = await this.ctx.querySessionSummaries(validated.query, validated.limit ?? 5)
-      let textResult = ""
-      for (const r of results) {
-        textResult += `## Session ${r.sessionId}: ${r.title}\n\n${r.snippets.join('\n\n')}\n\n`
+      const onlyOneReq = [typeof validated.list, typeof validated.call, typeof validated.tools].filter((m) => m !== "undefined").length === 1
+      if (!onlyOneReq) {
+        return { type: "error", error: "You can only request one of the three available actions, the other two must stay unset." }
       }
-      return { type: "success", result: textResult }
+      if (typeof validated.list !== "undefined") {
+        return { type: "success", result: Object.keys(this.ctx.servers).join(", ") }
+      } else if (validated.tools) {
+        const tools = await this.ctx.listTools(validated.tools.serverNames)
+        return { type: "success", result: tools }
+      } else if (validated.call) {
+        const result = await this.ctx.callTool(validated.call.serverName, validated.call.toolName, validated.call.toolInput)
+        return result
+      } else {
+        return { type: "error", error: "You did not request any action (list, tools, call) from this tool, and you need to request exactly one."}
+      }
     } catch (e) {
-      return { type: "error", error: `An error occurred while executing the 'memory' tool: ${e}`}
+      return {
+        type: "error",
+        error: `An error occurred while executing the \`mcp\` tool: ${e}`,
+      };
     }
   }
 }

@@ -2,3 +2,4 @@
 .env
 dist/
 node_modules/
+lightagent-local/.mcp.json

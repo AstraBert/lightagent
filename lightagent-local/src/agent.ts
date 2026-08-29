@@ -3,7 +3,6 @@ import {
   AgentStorage,
   convertEventsToMessages,
   messageToAssistantContent,
-  assistantContentToMessage,
   EditTool,
   Provider,
   ReadTool,
@@ -16,9 +15,9 @@ import {
   AsyncQueue,
   JsonValue,
   ToolResult,
-  CompactionResultSchema,
-  MemoryStorageEvent,
-  MemoryTool,
+  McpTool,
+  McpClient,
+  McpServer,
 } from "@cle-does-things/lightagent-core";
 import { LocalFileSystem } from "./fs.ts";
 import { getDbPath, LocalSqliteClient } from "./storage.ts";
@@ -28,7 +27,6 @@ import { toJsonSchema } from "@valibot/to-json-schema";
 import { ApiType, Llm, LlmRequest, Message, MessageRole, textMessage, ToolCallPart } from "@cle-does-things/llms-sdk";
 import { crypto } from "@std/crypto/crypto";
 import pLimit from "p-limit"
-import * as v from "valibot"
 
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1"
@@ -66,45 +64,6 @@ seems compelling enough for the task at hand.
 </tools_and_skills_usage>
 </guidelines>`
 const MAX_CONCURRENT_TOOL_CALLS = 10
-const COMPACTION_SYSTEM_PROMPT = `You are tasked with compacting a conversation between a user and an AI agent. Conversations may often contain a mix of text, thinking and tool calls/results. Your main task is to compact the conversation to its essential parts, capturing its goals, finished/unfinished tasks, key decisions, blockers, potential next steps and, in general, the critical context that should be carried on from the conversation into future ones. Since the AI agent might have access to the filesystem, you might need to include files that the agent accessed and wrote/modified over the course of the conversation. Your task is to be concise but effective, trying to convey the most information density possible. Your compation summaries will be used for retrieval (the agent goes back to past conversations and tries to see if there was anything relevant through natural language queries), so please structure the summaries in such a way that keywords and information density are optimized for a hybrid search pipeline. Follow this template for the final summary:
-\`\`\`md
-  ## Goal
-  [What the user is trying to accomplish]
-
-  ## Constraints & Preferences
-  - [Requirements mentioned by user]
-
-  ## Progress
-  ### Done
-  - [x] [Completed tasks]
-
-  ### In Progress
-  - [ ] [Current work]
-
-  ### Blocked
-  - [Issues, if any]
-
-  ## Key Decisions
-  - **[Decision]**: [Rationale]
-
-  ## Next Steps
-  1. [What should happen next]
-
-  ## Critical Context
-  - [Data needed to continue]
-
-  <read-files>
-  path/to/file1.ts
-  path/to/file2.ts
-  </read-files>
-
-  <modified-files>
-  path/to/changed.ts
-  </modified-files>
-\`\`\`
-`
-
-const DEFAULT_SUMMARIZATION_BUDGET = 32_000;
 
 function resolveCredentials(env: LocalEnvironment, provider?: Provider, apiKey?: string): {provider: Provider, apiKey: string} {
   if (apiKey && provider) {
@@ -144,14 +103,12 @@ export class LocalLightAgent {
   provider: Provider
   baseUrl: string
   model: string
-  summarizingModel: string
   apiKey: string
   system: string
   autoSkillDiscovery: boolean
   skillsList: string[]
   promptCaching: boolean
   parallelToolCalls: boolean
-  summarizationBudget: number = DEFAULT_SUMMARIZATION_BUDGET
   private llmClient: Llm = new Llm()
   private history: Message[] = []
   private env: LocalEnvironment = new LocalEnvironment()
@@ -167,7 +124,7 @@ export class LocalLightAgent {
     write: WriteTool,
     read: ReadTool,
     skills: SkillsTool,
-    memory: MemoryTool,
+    mcp?: McpTool,
   }
   private resolvedSkills: boolean = false
   private resolvedSystem: boolean = false
@@ -177,28 +134,23 @@ export class LocalLightAgent {
     provider?: Provider,
     apiKey?: string,
     baseUrl?: string,
-    summarizingModel?: string,
     system?: { content: string, append: boolean },
     autoSkillDiscovery?: boolean,
     skillsList?: string[],
     promptCaching?: boolean,
     parallelToolCalls?: boolean,
-    summarizationBudget?: number,
+    mcpServers?: Record<string, McpServer>
   }) {
     this.model = options.model
     const { provider, apiKey } = resolveCredentials(this.env, options.provider, options.apiKey)
     this.provider = provider
     this.apiKey = apiKey
-    this.summarizingModel = options.summarizingModel ?? options.model
     this.baseUrl = options.baseUrl ?? provider == "openai" ? DEFAULT_OPENAI_BASE_URL : DEFAULT_ANTHROPIC_BASE_URL
     this.autoSkillDiscovery = options.autoSkillDiscovery ?? options.skillsList ? false : true
     this.skillsList = options.skillsList ?? []
     this.system = options.system ? options.system.append ? `${DEFAULT_SYSTEM_PROMPT}\n\n${options.system.content}` : options.system.content : DEFAULT_SYSTEM_PROMPT
     this.promptCaching = options.promptCaching ?? true
     this.parallelToolCalls = options.parallelToolCalls ?? false
-    if (typeof options.summarizationBudget !== "undefined") {
-      this.summarizationBudget = options.summarizationBudget
-    }
     this.db = new LocalSqliteClient(getDbPath(this.fs))
     this.storage = new AgentStorage(this.db, this.fs)
     this.skillsClient = new SkillsClient(this.fs)
@@ -208,7 +160,10 @@ export class LocalLightAgent {
       write: new WriteTool(this.fs),
       skills: new SkillsTool(this.skillsClient),
       shell: new ShellTool(this.shell),
-      memory: new MemoryTool(this.storage)
+    }
+    if (options.mcpServers) {
+      const mcpClient = new McpClient(options.mcpServers)
+      this.tools.mcp = new McpTool(mcpClient)
     }
   }
 
@@ -243,6 +198,9 @@ export class LocalLightAgent {
     }
     this.system += "\n<tools>\n"
     for (const [_, tool] of Object.entries(this.tools)) {
+      if (!tool) {
+        continue
+      }
       this.system += `\n<name>${tool.name}</name>\n<description>${tool.description}</description>\n<input_schema>\n${JSON.stringify(toJsonSchema(tool.inputSchema))}\n</input_schema>`
     }
     this.system += "\n</tools>\n"
@@ -356,7 +314,7 @@ export class LocalLightAgent {
         apiKey: this.apiKey,
         stream: true,
         messages: this.history,
-        tools: Object.values(this.tools).map((t) => t.toSdkTool()),
+        tools: Object.values(this.tools).filter((t) => typeof t !== "undefined").map((t) => t.toSdkTool()),
         parallelToolCalls: this.parallelToolCalls,
         promptCacheTtl: this.promptCaching ? this.provider === "anthropic" ? "5m" : "30m" : undefined,
       } as LlmRequest;
@@ -496,7 +454,6 @@ export class LocalLightAgent {
       }
 
       if (toolCalls.length === 0) {
-        await this.summarizeAndStore(resolvedSid)
         const stopEvent: AgentEvent = {
           type: "session.stop",
           timestamp: new Date(),
@@ -572,6 +529,10 @@ export class LocalLightAgent {
               break
             case "skills":
               promises.push(limit(() => executeToolWithCallId(this.tools.skills.execute.bind(this.tools.skills), toolCall.arguments, toolCall.id)))
+              break
+            case "mcp":
+              promises.push(limit(() => executeToolWithCallId(this.tools.mcp!.execute.bind(this.tools.mcp!), toolCall.arguments, toolCall.id)))
+              break
           }
         }
       }
@@ -614,71 +575,5 @@ export class LocalLightAgent {
       }
     }
     return
-  }
-
-  private async summarizeAndStore(sessionId: string): Promise<MemoryStorageEvent> {
-    try {
-      const existing = await this.storage.getSessionSummary(sessionId)
-      let messages: Message[] = []
-      let shouldUpdate = false
-      if (!existing) {
-        messages = this.history.filter((m) => m.role !== "system")
-      } else {
-        shouldUpdate = true
-        const base = textMessage(`Summary of the previous checkpoint for session titled ${existing.title}\n\n${existing.summary}`, "user" as MessageRole)
-        const events = await this.storage.getSessionEvents(sessionId, existing.updated_at)
-        const filtered = events.filter((e) => e.type === "user.prompt_submit" || e.type === "assistant.response" || e.type === "tool.result")
-        messages = filtered.map((e) => {
-          switch (e.type) {
-            case "assistant.response":
-              return assistantContentToMessage(e.content)
-            case "user.prompt_submit":
-              return textMessage(e.prompt)
-            case "tool.result":
-              return {
-                role: "tool" as MessageRole,
-                content: [
-                  {
-                    type: "toolResult",
-                    result: e.result.type === "success" ? e.result.result : `An error occurred: ${e.result.error}`,
-                    toolCallId: e.toolCallId
-                  }
-                ]
-              } as Message
-          }
-        })
-        messages = [base, ...messages]
-      }
-      messages = [textMessage(COMPACTION_SYSTEM_PROMPT, "system" as MessageRole), ...messages]
-      const request = {
-        apiType: this.provider,
-        apiKey: this.apiKey,
-        model: this.summarizingModel,
-        messages,
-        stream: false,
-        parallelToolCalls: false,
-        maxOutputTokens: this.summarizationBudget,
-        outputFormat: {
-          name: "summary",
-          description: "Summary of the current session, based on the provided messages",
-          schema: toJsonSchema(CompactionResultSchema),
-        }
-      } as LlmRequest;
-      const llm = new Llm()
-      const response = await llm.respond(request)
-      const responseText = response.message.content.filter((c) => c.type === "text")[0]
-      if (!responseText) {
-        return { sessionId, success: false, timestamp: new Date(), type: "memory.storage", error: "Summarization model did not produce any summary" }
-      }
-      const validated = await v.parseAsync(CompactionResultSchema, JSON.parse(responseText.text))
-      if (shouldUpdate) {
-        await this.storage.updateSessionSummary(sessionId, validated.summary, validated.title)
-      } else {
-        await this.storage.setSessionSummary(sessionId, validated.summary, validated.title)
-      }
-      return { sessionId, success: true, timestamp: new Date(), type: "memory.storage" }
-    } catch (e) {
-      return { sessionId, success: false, timestamp: new Date(), type: "memory.storage", error: `An error occurred: ${e}` }
-    }
   }
 }

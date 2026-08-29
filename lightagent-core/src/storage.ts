@@ -62,51 +62,6 @@ export class AgentStorage {
     );
   }
 
-  async getSessionSummary(sessionId: string): Promise<{summary: string, title: string, updated_at: number} | undefined> {
-    await this.initStorage()
-    const stmt = await this.db.prepare<{summary: string, title: string, updated_at: number}>(
-      "select summary, title, updated_at from session_summaries where session_id = :sessionId"
-    )
-    const returned = stmt.get({ sessionId })
-    return returned
-  }
-
-  async setSessionSummary(sessionId: string, summary: string, title: string): Promise<void> {
-    await this.initStorage()
-    await this.db.exec("insert into session_summaries (session_id, summary, title, updated_at) VALUES (:sessionId, :summary, :title, :updatedAt)", {
-      sessionId,
-      summary,
-      title,
-      updatedAt: Number(new Date())
-    })
-  }
-
-  async updateSessionSummary(sessionId: string, summary: string, title: string): Promise<void> {
-    await this.initStorage()
-    await this.db.exec(
-      "update session_summaries set summary = :summary, title = :title, updated_at = :updatedAt where session_id = :sessionId",
-      {
-        sessionId,
-        summary,
-        title,
-        updatedAt: Number(new Date())
-      }
-    )
-  }
-
-  async querySessionSummaries(query: string, limit: number): Promise<{title: string, sessionId: string, snippets: string[]}[]> {
-    await this.initStorage()
-    const stmt = await this.db.prepare<{session_id: string, title: string, summary: string}>("select session_id, title, highlight(summary, 2, '<snippet>', '</snippet>') from session_summaries(:query) limit :limit order by rank")
-    const results = stmt.all({query, limit})
-    const snippetRegex = /<snippet>(.*?)<\/snippet>/g;
-    const withSnippets = results.map(row => ({
-        sessionId: row.session_id,
-        title: row.title,
-        snippets: [...row.summary.matchAll(snippetRegex)].map(m => m[1])
-    }));
-    return withSnippets
-  }
-
   async getSessionEvents(sessionId: string, afterTimestamp?: number): Promise<AgentEvent[]> {
     await this.initStorage();
     let sql = "select payload from events where session_id = :sessionId order by id, created_at"
@@ -119,7 +74,12 @@ export class AgentStorage {
     const events = stmt.all(params);
     const agentEvents: AgentEvent[] = [];
     for (const event of events) {
-      const data = JSON.parse(event.payload);
+      const data = JSON.parse(event.payload, (key, value) => {
+        if (key === "timestamp" && typeof value === "string") {
+          return new Date(value);
+        }
+        return value;
+      });
       agentEvents.push(await v.parseAsync(AgentEventSchema, data));
     }
     return agentEvents;

@@ -51,7 +51,7 @@ export class EventLogger {
         await writeLine(`Loaded skill: ${addColor(event.skillName, 45)}`);
         break;
       case "session.init":
-        await writeLine(addColor(`Starting session ${event.sessionId}`, 253));
+        await writeLine(addColor(`${event.initType === 'new' ? 'Starting' : 'Resuming'} session ${event.sessionId}`, 253));
         await writeOut("\n")
         break;
       case "tool.result": {

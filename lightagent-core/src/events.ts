@@ -276,7 +276,17 @@ export function convertEventsToMessages(events: AgentEvent[]): Message[] {
         messages.push({ role: "assistant" as MessageRole, content: parts });
         break;
       }
-      case "tool.call_any":
+      case "tool.call_any":  {
+        if (messages.length > 0) {
+          const lastMessage = messages.at(messages.length - 1)!
+          if (lastMessage.role === "assistant" as MessageRole) {
+            const tcs = lastMessage.content.filter((p) => p.type === "toolCall").map((t) => t.id)
+            if (tcs.includes(event.toolCallId)) {
+              // tool call already recorded in previous message
+              break
+            }
+          }
+        }
         messages.push({
           role: "assistant" as MessageRole,
           content: [{
@@ -287,6 +297,7 @@ export function convertEventsToMessages(events: AgentEvent[]): Message[] {
           }],
         });
         break;
+      }
       case "tool.result":
         messages.push({
           role: "tool" as MessageRole,
