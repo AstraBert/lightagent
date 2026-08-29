@@ -51,35 +51,52 @@ export class EventLogger {
         await writeLine(`Loaded skill: ${addColor(event.skillName, 45)}`);
         break;
       case "session.init":
-        await writeLine(addColor(`${event.initType === 'new' ? 'Starting' : 'Resuming'} session ${event.sessionId}`, 253));
-        await writeOut("\n")
+        await writeLine(
+          addColor(
+            `${
+              event.initType === "new" ? "Starting" : "Resuming"
+            } session ${event.sessionId}`,
+            253,
+          ),
+        );
+        await writeOut("\n");
         break;
       case "tool.result": {
-        await writeOut("\n")
+        await writeOut("\n");
         const body = event.result.type === "success"
           ? event.result.result!.slice(0, 200)
           : addColor(event.result.error!, 196);
         await writeLine(
-          `${event.result.type === "success" ? addColor("✓", 207) : addColor("✗", 207)} ${addColor("Tool Result for " + event.toolCallId, 207)}\n${addColor(body, 219)}`,
+          `${
+            event.result.type === "success"
+              ? addColor("✓", 207)
+              : addColor("✗", 207)
+          } ${addColor("Tool Result for " + event.toolCallId, 207)}\n${
+            addColor(body, 219)
+          }`,
         );
-        await writeOut("\n")
+        await writeOut("\n");
         break;
       }
       case "memory.storage": {
         if (event.error) {
-          await writeOut("\n")
-          await writeLine(`${addColor("\WARNING!", 220)} Could not store the summary of the current session, memories will be out of sync`)
+          await writeOut("\n");
+          await writeLine(
+            `${
+              addColor("\WARNING!", 220)
+            } Could not store the summary of the current session, memories will be out of sync`,
+          );
         }
-        break
+        break;
       }
       case "session.stop":
-        await writeOut("\n")
+        await writeOut("\n");
         await writeLine(
           event.success
             ? addColor(
-                `\nDone. toks in: ${event.usage.inputTokens}; toks out: ${event.usage.outputTokens}; duration: ${event.usage.latency}s`,
-                253,
-              )
+              `\nDone. toks in: ${event.usage.inputTokens}; toks out: ${event.usage.outputTokens}; duration: ${event.usage.latency}s`,
+              253,
+            )
             : `${addColor("\nERROR!", 196)} ${event.error ?? "unknown errors"}`,
         );
         break;
@@ -88,7 +105,9 @@ export class EventLogger {
     }
   }
 
-  private async logDelta(event: Extract<AgentEvent, { type: "stream.delta" }>): Promise<void> {
+  private async logDelta(
+    event: Extract<AgentEvent, { type: "stream.delta" }>,
+  ): Promise<void> {
     const isText = event.deltaType === "text";
 
     // Switching between thinking <-> texting: break the line once.

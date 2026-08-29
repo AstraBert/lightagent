@@ -1,15 +1,36 @@
 import { LocalLightAgent } from "./agent.ts";
 import { EventLogger } from "./logger.ts";
 import { parseArgs } from "@std/cli";
-import { isProvider, Provider, McpServersDefinitionSchema, McpServer } from "@cle-does-things/lightagent-core"
-import * as v from "valibot"
+import {
+  isProvider,
+  McpServer,
+  McpServersDefinitionSchema,
+  Provider,
+} from "@cle-does-things/lightagent-core";
+import * as v from "valibot";
 
-const VERSION = "0.1.0"
+const VERSION = "0.1.0";
 
 if (import.meta.main) {
   const cmdOptions = parseArgs(Deno.args, {
-    string: ["model", "provider", "api-key", "base-url", "system", "prompt", "session-id", "skill", "mcps-file" ],
-    boolean: ["parallel-tool-calls", "append-system", "prompt-caching", "discover-skills", "json"],
+    string: [
+      "model",
+      "provider",
+      "api-key",
+      "base-url",
+      "system",
+      "prompt",
+      "session-id",
+      "skill",
+      "mcps-file",
+    ],
+    boolean: [
+      "parallel-tool-calls",
+      "append-system",
+      "prompt-caching",
+      "discover-skills",
+      "json",
+    ],
     negatable: ["prompt-caching", "discover-skills"],
     collect: ["skill"],
     default: {
@@ -30,25 +51,32 @@ if (import.meta.main) {
   });
 
   if (!cmdOptions.model) {
-    console.error("\x1b[1;31mERROR! Missing required option `--model`\x1b[1;39m")
-    Deno.exit(1)
+    console.error(
+      "\x1b[1;31mERROR! Missing required option `--model`\x1b[1;39m",
+    );
+    Deno.exit(1);
   }
 
-  let system = undefined
+  let system = undefined;
   if (cmdOptions.system) {
-    system = { content: cmdOptions.system, append: cmdOptions["append-system"] }
+    system = {
+      content: cmdOptions.system,
+      append: cmdOptions["append-system"],
+    };
   }
-  let mcpServers: Record<string, McpServer> | undefined = undefined
+  let mcpServers: Record<string, McpServer> | undefined = undefined;
   if (cmdOptions["mcps-file"]) {
-    const content = await Deno.readTextFile(cmdOptions["mcps-file"])
-    const servers = v.parse(McpServersDefinitionSchema, JSON.parse(content))
-    mcpServers = servers.mcpServers
+    const content = await Deno.readTextFile(cmdOptions["mcps-file"]);
+    const servers = v.parse(McpServersDefinitionSchema, JSON.parse(content));
+    mcpServers = servers.mcpServers;
   }
 
   if (cmdOptions.provider) {
     if (!isProvider(cmdOptions.provider)) {
-      console.error("\x1b[1;31mERROR! Unsupported provider. The only supported providers are: openai, anthropic\x1b[1;39m")
-      Deno.exit(1)
+      console.error(
+        "\x1b[1;31mERROR! Unsupported provider. The only supported providers are: openai, anthropic\x1b[1;39m",
+      );
+      Deno.exit(1);
     }
   }
 
@@ -63,41 +91,45 @@ if (import.meta.main) {
     parallelToolCalls: cmdOptions["parallel-tool-calls"],
     baseUrl: cmdOptions["base-url"],
     autoSkillDiscovery: cmdOptions["discover-skills"],
-  })
+  });
 
-  await agent.checkForMigrations()
+  await agent.checkForMigrations();
 
-  const logger = new EventLogger(cmdOptions.json)
+  const logger = new EventLogger(cmdOptions.json);
 
   // Headless mode: --prompt provided
   if (cmdOptions.prompt) {
-    for await (const event of agent.run(cmdOptions.prompt, cmdOptions["session-id"])) {
+    for await (
+      const event of agent.run(cmdOptions.prompt, cmdOptions["session-id"])
+    ) {
       await logger.log(event);
     }
-    Deno.exit(0)
+    Deno.exit(0);
   }
 
   // Interactive CLI mode
-  console.log(`\x1b[1;36mLightAgent v${VERSION}\x1b[0m`)
-  console.log("\x1b[2mType your prompt and press Enter. Use Ctrl+C or type 'exit' to quit.\x1b[0m\n")
+  console.log(`\x1b[1;36mLightAgent v${VERSION}\x1b[0m`);
+  console.log(
+    "\x1b[2mType your prompt and press Enter. Use Ctrl+C or type 'exit' to quit.\x1b[0m\n",
+  );
 
   let sessionId: string | undefined = cmdOptions["session-id"];
 
   while (true) {
-    const promptText = prompt("\x1b[1;32m>\x1b[0m ")
+    const promptText = prompt("\x1b[1;32m>\x1b[0m ");
     if (promptText === null || promptText.trim().toLowerCase() === "exit") {
-      console.log("\x1b[2mGoodbye!\x1b[0m")
-      break
+      console.log("\x1b[2mGoodbye!\x1b[0m");
+      break;
     }
-    if (!promptText.trim()) continue
+    if (!promptText.trim()) continue;
 
     for await (const event of agent.run(promptText, sessionId)) {
-      await logger.log(event)
+      await logger.log(event);
       if (event.type === "session.init") {
         sessionId = event.sessionId;
       }
     }
 
-    console.log() // blank line between turns
+    console.log(); // blank line between turns
   }
 }

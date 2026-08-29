@@ -1,19 +1,24 @@
 import * as path from "@std/path";
 import { extractYaml } from "@std/front-matter";
 import { assertValidSkillName } from "./assertions.ts";
-import { type FileSystem, exists } from "./fs.ts";
+import { exists, type FileSystem } from "./fs.ts";
 
 export class SkillsClient {
-  fs: FileSystem
-  basePath: string = ".agents/skills"
+  fs: FileSystem;
+  basePath: string = ".agents/skills";
 
   constructor(fs: FileSystem) {
-    this.fs = fs
+    this.fs = fs;
   }
 
   async getSkillPath(skillName: string): Promise<string> {
     assertValidSkillName(skillName);
-    const globalPath = path.join(this.fs.homeDir()!, this.basePath, skillName, "SKILL.md");
+    const globalPath = path.join(
+      this.fs.homeDir()!,
+      this.basePath,
+      skillName,
+      "SKILL.md",
+    );
     const localPath = path.join(".", this.basePath, skillName, "SKILL.md");
     if (await exists(localPath, this.fs)) {
       return localPath;
@@ -25,7 +30,9 @@ export class SkillsClient {
     );
   }
 
-  async parseSkill(skillPath: string): Promise<{description: string, content: string}> {
+  async parseSkill(
+    skillPath: string,
+  ): Promise<{ description: string; content: string }> {
     const content = await this.fs.readToString(skillPath);
     const parsed = extractYaml<{
       name: string;
@@ -37,7 +44,6 @@ export class SkillsClient {
     }>(content);
     return { description: parsed.attrs.description, content: parsed.body };
   }
-
 
   async findSkills(): Promise<Map<string, string>> {
     const globalPath = path.join(this.fs.homeDir()!, this.basePath);

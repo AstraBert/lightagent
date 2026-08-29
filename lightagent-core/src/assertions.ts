@@ -1,4 +1,4 @@
-import * as path from "@std/path"
+import * as path from "@std/path";
 
 export function assertValidSkillName(skillName: string): void {
   if (skillName.length === 0 || skillName.length > 64) {
@@ -11,23 +11,29 @@ export function assertValidSkillName(skillName: string): void {
   }
 }
 
-export function assertFileWithinWorkspace(filePath: string, basePath: string): string {
+export function assertFileWithinWorkspace(
+  filePath: string,
+  basePath: string,
+): string {
   let resolved: string;
   if (path.isAbsolute(filePath)) {
     resolved = filePath;
   } else {
-    resolved = path.normalize(path.join(basePath, filePath))
+    resolved = path.normalize(path.join(basePath, filePath));
   }
   if (path.common([resolved, basePath]) === basePath) {
-    return resolved
+    return resolved;
   }
-  throw new Error("Attempting to access file outside of current working directory")
+  throw new Error(
+    "Attempting to access file outside of current working directory",
+  );
 }
-
 
 export function assertUniqueString(container: string, contained: string): void {
   if (container.indexOf(contained) === container.lastIndexOf(contained)) {
-    return
+    return;
   }
-  throw new Error("Attempting to modify a non-unique string: set `replace_all` to True if you want to perform multiple edits at once")
+  throw new Error(
+    "Attempting to modify a non-unique string: set `replace_all` to True if you want to perform multiple edits at once",
+  );
 }

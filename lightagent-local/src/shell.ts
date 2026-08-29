@@ -6,21 +6,29 @@ export class LocalShell implements Shell {
     command: string,
     timeout: number,
     options?: {
-      args?: string[],
-      stdout?: StdFileMode,
-      stderr?: StdFileMode,
-      stdin?: StdFileMode
+      args?: string[];
+      stdout?: StdFileMode;
+      stderr?: StdFileMode;
+      stdin?: StdFileMode;
+    },
+  ): Promise<
+    {
+      code: number;
+      success: boolean;
+      timedOut: boolean;
+      stderr: string;
+      stdout: string;
     }
-  ): Promise<{ code: number; success: boolean; timedOut: boolean; stderr: string; stdout: string; }> {
-    const cmd = new Deno.Command(command, options)
+  > {
+    const cmd = new Deno.Command(command, options);
     const child = cmd.spawn();
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
       try {
-          child.kill("SIGTERM");
+        child.kill("SIGTERM");
       } catch {
-          // process may have already exited
+        // process may have already exited
       }
     }, timeout * 1000);
 
@@ -31,7 +39,7 @@ export class LocalShell implements Shell {
       stderr: new TextDecoder().decode(stderr),
       stdout: new TextDecoder().decode(stdout),
       success,
-      timedOut
-    }
+      timedOut,
+    };
   }
 }

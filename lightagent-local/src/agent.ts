@@ -1,35 +1,43 @@
 import {
   AgentEvent,
   AgentStorage,
+  AsyncQueue,
   convertEventsToMessages,
-  messageToAssistantContent,
   EditTool,
+  JsonValue,
+  McpClient,
+  McpServer,
+  McpTool,
+  messageToAssistantContent,
   Provider,
   ReadTool,
   SessionInitType,
   ShellTool,
   SkillsClient,
   SkillsTool,
-  WriteTool,
-  Usage,
-  AsyncQueue,
-  JsonValue,
   ToolResult,
-  McpTool,
-  McpClient,
-  McpServer,
+  Usage,
+  WriteTool,
 } from "@cle-does-things/lightagent-core";
 import { LocalFileSystem } from "./fs.ts";
 import { getDbPath, LocalSqliteClient } from "./storage.ts";
 import { LocalShell } from "./shell.ts";
 import { LocalEnvironment } from "./environment.ts";
 import { toJsonSchema } from "@valibot/to-json-schema";
-import { ApiType, Llm, LlmRequest, Message, MessageRole, textMessage, ToolCallPart } from "@cle-does-things/llms-sdk";
+import {
+  ApiType,
+  Llm,
+  LlmRequest,
+  Message,
+  MessageRole,
+  textMessage,
+  ToolCallPart,
+} from "@cle-does-things/llms-sdk";
 import { crypto } from "@std/crypto/crypto";
-import pLimit from "p-limit"
+import pLimit from "p-limit";
 
-const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
-const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1"
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
 const DEFAULT_SYSTEM_PROMPT = `<identity>
 You are LightAgent, an AI agent whose purpose is to
 fulfil request coming from a user, employing the tools and skills
@@ -62,30 +70,38 @@ providing the name of the skill to it. The 'skills' tool will return the specifi
 skill. Invoke a skill either when directly prompted by the user to do so, or when the skill's description
 seems compelling enough for the task at hand.
 </tools_and_skills_usage>
-</guidelines>`
-const MAX_CONCURRENT_TOOL_CALLS = 10
+</guidelines>`;
+const MAX_CONCURRENT_TOOL_CALLS = 10;
 
-function resolveCredentials(env: LocalEnvironment, provider?: Provider, apiKey?: string): {provider: Provider, apiKey: string} {
+function resolveCredentials(
+  env: LocalEnvironment,
+  provider?: Provider,
+  apiKey?: string,
+): { provider: Provider; apiKey: string } {
   if (apiKey && provider) {
-    return { provider, apiKey }
+    return { provider, apiKey };
   } else if (!apiKey && provider) {
-    const key = env.get(`${provider.toUpperCase()}_API_KEY`)
+    const key = env.get(`${provider.toUpperCase()}_API_KEY`);
     if (!key) {
-      throw new Error(`Could not find ${provider.toUpperCase()}_API_KEY in the current environment`)
+      throw new Error(
+        `Could not find ${provider.toUpperCase()}_API_KEY in the current environment`,
+      );
     }
-    return { provider, apiKey: key }
+    return { provider, apiKey: key };
   } else if (!apiKey && !provider) {
-    const openaiKey = env.get("OPENAI_API_KEY")
+    const openaiKey = env.get("OPENAI_API_KEY");
     if (openaiKey) {
-      return { provider: "openai", apiKey: openaiKey }
+      return { provider: "openai", apiKey: openaiKey };
     }
-    const anthropicKey = env.get("ANTHROPIC_API_KEY")
+    const anthropicKey = env.get("ANTHROPIC_API_KEY");
     if (anthropicKey) {
-      return { provider: "anthropic", apiKey: anthropicKey }
+      return { provider: "anthropic", apiKey: anthropicKey };
     }
-    throw new Error("Neither OPENAI_API_KEY nor ANTHROPIC_API_KEY are in the current environment, could not infer provider")
+    throw new Error(
+      "Neither OPENAI_API_KEY nor ANTHROPIC_API_KEY are in the current environment, could not infer provider",
+    );
   } else {
-    throw new Error("Cannot infer provider from the API key only")
+    throw new Error("Cannot infer provider from the API key only");
   }
 }
 
@@ -96,151 +112,186 @@ function defaultUsage(sessionStart: Date): Usage {
     latency: Date.now() - Number(sessionStart),
     inputTokens: 0,
     outputTokens: 0,
-  }
+  };
 }
 
 export class LocalLightAgent {
-  provider: Provider
-  baseUrl: string
-  model: string
-  apiKey: string
-  system: string
-  autoSkillDiscovery: boolean
-  skillsList: string[]
-  promptCaching: boolean
-  parallelToolCalls: boolean
-  private llmClient: Llm = new Llm()
-  private history: Message[] = []
-  private env: LocalEnvironment = new LocalEnvironment()
-  private skills: Map<string, string> = new Map()
-  private fs: LocalFileSystem = new LocalFileSystem()
-  private shell: LocalShell = new LocalShell()
-  private db: LocalSqliteClient
-  private storage: AgentStorage
-  private skillsClient: SkillsClient
+  provider: Provider;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  system: string;
+  autoSkillDiscovery: boolean;
+  skillsList: string[];
+  promptCaching: boolean;
+  parallelToolCalls: boolean;
+  private llmClient: Llm = new Llm();
+  private history: Message[] = [];
+  private env: LocalEnvironment = new LocalEnvironment();
+  private skills: Map<string, string> = new Map();
+  private fs: LocalFileSystem = new LocalFileSystem();
+  private shell: LocalShell = new LocalShell();
+  private db: LocalSqliteClient;
+  private storage: AgentStorage;
+  private skillsClient: SkillsClient;
   private tools: {
-    shell: ShellTool,
-    edit: EditTool,
-    write: WriteTool,
-    read: ReadTool,
-    skills: SkillsTool,
-    mcp?: McpTool,
-  }
-  private resolvedSkills: boolean = false
-  private resolvedSystem: boolean = false
+    shell: ShellTool;
+    edit: EditTool;
+    write: WriteTool;
+    read: ReadTool;
+    skills: SkillsTool;
+    mcp?: McpTool;
+  };
+  private resolvedSkills: boolean = false;
+  private resolvedSystem: boolean = false;
 
   constructor(options: {
-    model: string,
-    provider?: Provider,
-    apiKey?: string,
-    baseUrl?: string,
-    system?: { content: string, append: boolean },
-    autoSkillDiscovery?: boolean,
-    skillsList?: string[],
-    promptCaching?: boolean,
-    parallelToolCalls?: boolean,
-    mcpServers?: Record<string, McpServer>
+    model: string;
+    provider?: Provider;
+    apiKey?: string;
+    baseUrl?: string;
+    system?: { content: string; append: boolean };
+    autoSkillDiscovery?: boolean;
+    skillsList?: string[];
+    promptCaching?: boolean;
+    parallelToolCalls?: boolean;
+    mcpServers?: Record<string, McpServer>;
   }) {
-    this.model = options.model
-    const { provider, apiKey } = resolveCredentials(this.env, options.provider, options.apiKey)
-    this.provider = provider
-    this.apiKey = apiKey
-    this.baseUrl = options.baseUrl ?? provider == "openai" ? DEFAULT_OPENAI_BASE_URL : DEFAULT_ANTHROPIC_BASE_URL
-    this.autoSkillDiscovery = options.autoSkillDiscovery ?? options.skillsList ? false : true
-    this.skillsList = options.skillsList ?? []
-    this.system = options.system ? options.system.append ? `${DEFAULT_SYSTEM_PROMPT}\n\n${options.system.content}` : options.system.content : DEFAULT_SYSTEM_PROMPT
-    this.promptCaching = options.promptCaching ?? true
-    this.parallelToolCalls = options.parallelToolCalls ?? false
-    this.db = new LocalSqliteClient(getDbPath(this.fs))
-    this.storage = new AgentStorage(this.db, this.fs)
-    this.skillsClient = new SkillsClient(this.fs)
+    this.model = options.model;
+    const { provider, apiKey } = resolveCredentials(
+      this.env,
+      options.provider,
+      options.apiKey,
+    );
+    this.provider = provider;
+    this.apiKey = apiKey;
+    this.baseUrl = options.baseUrl ?? provider == "openai"
+      ? DEFAULT_OPENAI_BASE_URL
+      : DEFAULT_ANTHROPIC_BASE_URL;
+    this.autoSkillDiscovery = options.autoSkillDiscovery ?? options.skillsList
+      ? false
+      : true;
+    this.skillsList = options.skillsList ?? [];
+    this.system = options.system
+      ? options.system.append
+        ? `${DEFAULT_SYSTEM_PROMPT}\n\n${options.system.content}`
+        : options.system.content
+      : DEFAULT_SYSTEM_PROMPT;
+    this.promptCaching = options.promptCaching ?? true;
+    this.parallelToolCalls = options.parallelToolCalls ?? false;
+    this.db = new LocalSqliteClient(getDbPath(this.fs));
+    this.storage = new AgentStorage(this.db, this.fs);
+    this.skillsClient = new SkillsClient(this.fs);
     this.tools = {
       edit: new EditTool(this.fs),
       read: new ReadTool(this.fs),
       write: new WriteTool(this.fs),
       skills: new SkillsTool(this.skillsClient),
       shell: new ShellTool(this.shell),
-    }
+    };
     if (options.mcpServers) {
-      const mcpClient = new McpClient(options.mcpServers)
-      this.tools.mcp = new McpTool(mcpClient)
+      const mcpClient = new McpClient(options.mcpServers);
+      this.tools.mcp = new McpTool(mcpClient);
     }
   }
 
   private async resolveSkills() {
     if (this.resolvedSkills) {
-      return
+      return;
     }
     if (this.autoSkillDiscovery) {
-      this.skills = await this.skillsClient.findSkills()
+      this.skills = await this.skillsClient.findSkills();
     } else if (this.skillsList) {
       for (const skill of this.skillsList) {
-        const skillPath = await this.skillsClient.getSkillPath(skill)
-        const { description } = await this.skillsClient.parseSkill(skillPath)
-        this.skills.set(skill, description)
+        const skillPath = await this.skillsClient.getSkillPath(skill);
+        const { description } = await this.skillsClient.parseSkill(skillPath);
+        this.skills.set(skill, description);
       }
     }
-    this.resolvedSkills = true
+    this.resolvedSkills = true;
   }
 
   private async resolveSystem() {
     if (this.resolvedSystem) {
-      return
+      return;
     }
-    this.system += `<model>You are ${this.model} served through an ${this.provider}-compatible API</model>`
+    this.system +=
+      `<model>You are ${this.model} served through an ${this.provider}-compatible API</model>`;
     if (this.skillsList && this.skillsList.length > 0) {
-      this.system += "\n<skills>\n"
-      await this.resolveSkills()
+      this.system += "\n<skills>\n";
+      await this.resolveSkills();
       for (const [skill, description] of this.skills.entries()) {
-        this.system += `\n<name>${skill}</name>\n<description>${description}</description>`
+        this.system +=
+          `\n<name>${skill}</name>\n<description>${description}</description>`;
       }
-      this.system += "\n</skills>\n"
+      this.system += "\n</skills>\n";
     }
-    this.system += "\n<tools>\n"
+    this.system += "\n<tools>\n";
     for (const [_, tool] of Object.entries(this.tools)) {
       if (!tool) {
-        continue
+        continue;
       }
-      this.system += `\n<name>${tool.name}</name>\n<description>${tool.description}</description>\n<input_schema>\n${JSON.stringify(toJsonSchema(tool.inputSchema))}\n</input_schema>`
+      this.system +=
+        `\n<name>${tool.name}</name>\n<description>${tool.description}</description>\n<input_schema>\n${
+          JSON.stringify(toJsonSchema(tool.inputSchema))
+        }\n</input_schema>`;
     }
-    this.system += "\n</tools>\n"
-    this.resolvedSystem = true
+    this.system += "\n</tools>\n";
+    this.resolvedSystem = true;
   }
 
   async checkForMigrations(): Promise<void> {
-    await this.storage.initStorage()
+    await this.storage.initStorage();
   }
 
   private async resolvePrompt(prompt: string) {
     if (prompt.startsWith("/")) {
-      const skillName = prompt.split(" ")[0]!.slice(1)
-      const skillPath = await this.skillsClient.getSkillPath(skillName)
-      const { content } = await this.skillsClient.parseSkill(skillPath)
-      const newPrompt = prompt.replace(`/${skillName}`, `<skill>\n${content}\n</skill>\n`)
-      return newPrompt
+      const skillName = prompt.split(" ")[0]!.slice(1);
+      const skillPath = await this.skillsClient.getSkillPath(skillName);
+      const { content } = await this.skillsClient.parseSkill(skillPath);
+      const newPrompt = prompt.replace(
+        `/${skillName}`,
+        `<skill>\n${content}\n</skill>\n`,
+      );
+      return newPrompt;
     }
-    return prompt
+    return prompt;
   }
 
-
-  private async safeStore(event: AgentEvent, sessionId: string, usage?: Usage, startTime?: Date): Promise<AgentEvent | undefined> {
+  private async safeStore(
+    event: AgentEvent,
+    sessionId: string,
+    usage?: Usage,
+    startTime?: Date,
+  ): Promise<AgentEvent | undefined> {
     try {
-      await this.storage.store(event)
+      await this.storage.store(event);
     } catch (e) {
       return {
         type: "session.stop" as const,
         success: false,
         timestamp: new Date(),
-        error: `An error occurred while trying to store an event in the SQLite database: ${e}`,
+        error:
+          `An error occurred while trying to store an event in the SQLite database: ${e}`,
         usage: usage ?? defaultUsage(startTime ?? new Date()),
         sessionId,
-      }
+      };
     }
   }
 
-  private async safeGetSessionEvents(sessionId: string): Promise<{type: "success", events: AgentEvent[]} | { type: "failure", event: AgentEvent }> {
+  private async safeGetSessionEvents(
+    sessionId: string,
+  ): Promise<
+    { type: "success"; events: AgentEvent[] } | {
+      type: "failure";
+      event: AgentEvent;
+    }
+  > {
     try {
-      return {type: "success", events: await this.storage.getSessionEvents(sessionId)}
+      return {
+        type: "success",
+        events: await this.storage.getSessionEvents(sessionId),
+      };
     } catch (e) {
       return {
         type: "failure",
@@ -248,63 +299,88 @@ export class LocalLightAgent {
           type: "session.stop" as const,
           success: false,
           timestamp: new Date(),
-          error: `An error occurred while trying to store an event in the SQLite database: ${e}`,
+          error:
+            `An error occurred while trying to store an event in the SQLite database: ${e}`,
           usage: defaultUsage(new Date()),
           sessionId,
-        }
-      }
+        },
+      };
     }
   }
 
-  async* run(prompt: string, sessionId?: string): AsyncGenerator<AgentEvent> {
-    await this.resolveSystem()
+  async *run(prompt: string, sessionId?: string): AsyncGenerator<AgentEvent> {
+    await this.resolveSystem();
     let resolvedSid: string;
     let errEvent: AgentEvent | undefined;
     if (sessionId) {
       resolvedSid = sessionId;
-      const result = await this.safeGetSessionEvents(sessionId)
+      const result = await this.safeGetSessionEvents(sessionId);
       if (result.type == "failure") {
-        yield result.event
-        return
+        yield result.event;
+        return;
       }
-      this.history = convertEventsToMessages(result.events)
-      const initEvent = { type: "session.init" as const, initType: "resume" as SessionInitType, system: this.system, sessionId, provider: this.provider, model: this.model, timestamp: new Date() }
-      errEvent = await this.safeStore(initEvent, resolvedSid)
+      this.history = convertEventsToMessages(result.events);
+      const initEvent = {
+        type: "session.init" as const,
+        initType: "resume" as SessionInitType,
+        system: this.system,
+        sessionId,
+        provider: this.provider,
+        model: this.model,
+        timestamp: new Date(),
+      };
+      errEvent = await this.safeStore(initEvent, resolvedSid);
       if (errEvent) {
-        yield errEvent
-        return
+        yield errEvent;
+        return;
       }
-      yield initEvent
+      yield initEvent;
     } else {
-      resolvedSid = crypto.randomUUID()
-      const initEvent = { type: "session.init" as const, initType: "new" as SessionInitType, system: this.system, sessionId: resolvedSid, provider: this.provider, model: this.model, timestamp: new Date() }
-      errEvent = await this.safeStore(initEvent, resolvedSid)
+      resolvedSid = crypto.randomUUID();
+      const initEvent = {
+        type: "session.init" as const,
+        initType: "new" as SessionInitType,
+        system: this.system,
+        sessionId: resolvedSid,
+        provider: this.provider,
+        model: this.model,
+        timestamp: new Date(),
+      };
+      errEvent = await this.safeStore(initEvent, resolvedSid);
       if (errEvent) {
-        yield errEvent
-        return
+        yield errEvent;
+        return;
       }
-      yield initEvent
+      yield initEvent;
     }
-    this.history = [textMessage(this.system, "system" as MessageRole), ...this.history]
-    const resolvedPrompt = await this.resolvePrompt(prompt)
-    this.history.push(textMessage(resolvedPrompt))
+    this.history = [
+      textMessage(this.system, "system" as MessageRole),
+      ...this.history,
+    ];
+    const resolvedPrompt = await this.resolvePrompt(prompt);
+    this.history.push(textMessage(resolvedPrompt));
     const sessionStart = new Date();
-    let inputTokens = 0
-    let outputTokens = 0
-    let cacheReadTokens = 0
-    let cacheWriteTokens = 0
-    const turnId = crypto.randomUUID()
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheReadTokens = 0;
+    let cacheWriteTokens = 0;
+    const turnId = crypto.randomUUID();
     const userPromptSubmit: AgentEvent = {
       type: "user.prompt_submit",
       prompt: resolvedPrompt,
       sessionId: resolvedSid,
       turnId,
       timestamp: new Date(),
-    }
-    errEvent = await this.safeStore(userPromptSubmit, resolvedSid, undefined, sessionStart)
+    };
+    errEvent = await this.safeStore(
+      userPromptSubmit,
+      resolvedSid,
+      undefined,
+      sessionStart,
+    );
     if (errEvent) {
-      yield errEvent
-      return
+      yield errEvent;
+      return;
     }
     while (true) {
       const request = {
@@ -314,13 +390,16 @@ export class LocalLightAgent {
         apiKey: this.apiKey,
         stream: true,
         messages: this.history,
-        tools: Object.values(this.tools).filter((t) => typeof t !== "undefined").map((t) => t.toSdkTool()),
+        tools: Object.values(this.tools).filter((t) => typeof t !== "undefined")
+          .map((t) => t.toSdkTool()),
         parallelToolCalls: this.parallelToolCalls,
-        promptCacheTtl: this.promptCaching ? this.provider === "anthropic" ? "5m" : "30m" : undefined,
+        promptCacheTtl: this.promptCaching
+          ? this.provider === "anthropic" ? "5m" : "30m"
+          : undefined,
       } as LlmRequest;
-      const queue = new AsyncQueue<AgentEvent>()
-      let toolCalls: ToolCallPart[] = []
-      let assistantMessage: Message | null = null
+      const queue = new AsyncQueue<AgentEvent>();
+      let toolCalls: ToolCallPart[] = [];
+      let assistantMessage: Message | null = null;
       this.llmClient.streamResponse(request, (err, chunk) => {
         if (err) {
           queue.push({
@@ -328,105 +407,112 @@ export class LocalLightAgent {
               type: "session.stop" as const,
               success: false,
               timestamp: new Date(),
-              error: `An error occurred while generating the agent response: ${err}`,
+              error:
+                `An error occurred while generating the agent response: ${err}`,
               usage: {
                 cacheReadTokens,
                 cacheWriteTokens,
                 inputTokens,
                 outputTokens,
-                latency: Date.now() - Number(sessionStart)
+                latency: Date.now() - Number(sessionStart),
               },
               sessionId: resolvedSid,
             },
             isError: true,
-          })
-          return
+          });
+          return;
         }
         if (!chunk) {
-          queue.push({done: true})
-          return
+          queue.push({ done: true });
+          return;
         }
         switch (chunk.type) {
           case "textDelta":
-            queue.push({chunk: {
+            queue.push({
+              chunk: {
                 type: "stream.delta",
                 delta: chunk.textDelta ?? "",
                 deltaType: "text",
                 turnId,
                 sessionId: resolvedSid,
                 timestamp: new Date(),
-              }
-            })
-            break
+              },
+            });
+            break;
           case "thinkingDelta":
-            queue.push({chunk: {
-              type: "stream.delta",
-              delta: chunk.thinkingDelta ?? "",
-              deltaType: "thinking",
-              turnId,
-              sessionId: resolvedSid,
-              timestamp: new Date(),
-            }})
-            break
+            queue.push({
+              chunk: {
+                type: "stream.delta",
+                delta: chunk.thinkingDelta ?? "",
+                deltaType: "thinking",
+                turnId,
+                sessionId: resolvedSid,
+                timestamp: new Date(),
+              },
+            });
+            break;
           case "complete": {
-            assistantMessage = chunk.message
-            toolCalls = chunk.toolCalls ?? []
+            assistantMessage = chunk.message;
+            toolCalls = chunk.toolCalls ?? [];
             if (chunk.usage) {
-              inputTokens += chunk.usage.inputTokens
-              outputTokens += chunk.usage.outputTokens
-              cacheReadTokens += chunk.usage.cacheReadTokens ?? 0
-              cacheWriteTokens += chunk.usage.cacheWriteTokens ?? 0
+              inputTokens += chunk.usage.inputTokens;
+              outputTokens += chunk.usage.outputTokens;
+              cacheReadTokens += chunk.usage.cacheReadTokens ?? 0;
+              cacheWriteTokens += chunk.usage.cacheWriteTokens ?? 0;
             }
-            queue.push({chunk: {
-              type: "assistant.response",
-              content: messageToAssistantContent(chunk.message.content),
-              sessionId: resolvedSid,
-              turnId,
-              timestamp: new Date(),
-            }, done: true})
-            break
+            queue.push({
+              chunk: {
+                type: "assistant.response",
+                content: messageToAssistantContent(chunk.message.content),
+                sessionId: resolvedSid,
+                turnId,
+                timestamp: new Date(),
+              },
+              done: true,
+            });
+            break;
           }
           default:
         }
-      })
+      });
 
-      let hasError = false
+      let hasError = false;
 
       while (true) {
         const item = await queue.next();
         if (item.chunk && item.isError) {
-          hasError = true
+          hasError = true;
           errEvent = await this.safeStore(item.chunk, resolvedSid, {
             inputTokens,
             outputTokens,
             cacheReadTokens,
             cacheWriteTokens,
-            latency: Date.now() - Number(sessionStart)
-          })
+            latency: Date.now() - Number(sessionStart),
+          });
           if (errEvent) {
-            yield errEvent
-            break
+            yield errEvent;
+            break;
           }
-          yield item.chunk
-          break
+          yield item.chunk;
+          break;
         } else if (item.done && !item.chunk) {
-          break
+          break;
         } else {
           errEvent = await this.safeStore(item.chunk!, resolvedSid, {
             inputTokens,
             outputTokens,
             cacheReadTokens,
             cacheWriteTokens,
-            latency: Date.now() - Number(sessionStart)
-          })
+            latency: Date.now() - Number(sessionStart),
+          });
           if (errEvent) {
-            hasError = true
-            yield errEvent
-            break
+            hasError = true;
+            yield errEvent;
+            break;
           }
           yield item.chunk!;
           if (item.done) {
-            break
+            break;
           }
         }
       }
@@ -443,14 +529,14 @@ export class LocalLightAgent {
             outputTokens,
             cacheReadTokens,
             cacheWriteTokens,
-            latency: Date.now() - Number(sessionStart)
-          }
-        }
-        break
+            latency: Date.now() - Number(sessionStart),
+          },
+        };
+        break;
       }
 
       if (hasError) {
-        break
+        break;
       }
 
       if (toolCalls.length === 0) {
@@ -458,90 +544,170 @@ export class LocalLightAgent {
           type: "session.stop",
           timestamp: new Date(),
           success: true,
-          result: messageToAssistantContent((assistantMessage as Message).content),
+          result: messageToAssistantContent(
+            (assistantMessage as Message).content,
+          ),
           sessionId: resolvedSid,
           usage: {
             inputTokens,
             cacheReadTokens,
             cacheWriteTokens,
             outputTokens,
-            latency: Date.now() - Number(sessionStart)
-          }
-        }
+            latency: Date.now() - Number(sessionStart),
+          },
+        };
         errEvent = await this.safeStore(stopEvent, resolvedSid, {
           inputTokens,
           cacheReadTokens,
           cacheWriteTokens,
           outputTokens,
-          latency: Date.now() - Number(sessionStart)
-        })
+          latency: Date.now() - Number(sessionStart),
+        });
         if (errEvent) {
-          yield errEvent
-          break
+          yield errEvent;
+          break;
         }
-        yield stopEvent
-        break
+        yield stopEvent;
+        break;
       }
-      this.history.push(assistantMessage)
-      const limit = pLimit(this.parallelToolCalls ? MAX_CONCURRENT_TOOL_CALLS : 1)
-      const executeToolWithCallId = async (execFn: (input: JsonValue) => Promise<ToolResult>, args: string, callId: string) => {
-        const result = await execFn(JSON.parse(args))
-        return { result, callId }
-      }
-      const promises = []
-      let hasStoreError = false
+      this.history.push(assistantMessage);
+      const limit = pLimit(
+        this.parallelToolCalls ? MAX_CONCURRENT_TOOL_CALLS : 1,
+      );
+      const executeToolWithCallId = async (
+        execFn: (input: JsonValue) => Promise<ToolResult>,
+        args: string,
+        callId: string,
+      ) => {
+        const result = await execFn(JSON.parse(args));
+        return { result, callId };
+      };
+      const promises = [];
+      let hasStoreError = false;
       for (const toolCall of toolCalls) {
         if (Object.keys(this.tools).includes(toolCall.name)) {
-          const toolCallEventAny: AgentEvent = { type: "tool.call_any", timestamp: new Date(), input: JSON.parse(toolCall.arguments), name: toolCall.name, turnId, sessionId: resolvedSid, toolCallId: toolCall.id }
+          const toolCallEventAny: AgentEvent = {
+            type: "tool.call_any",
+            timestamp: new Date(),
+            input: JSON.parse(toolCall.arguments),
+            name: toolCall.name,
+            turnId,
+            sessionId: resolvedSid,
+            toolCallId: toolCall.id,
+          };
           errEvent = await this.safeStore(toolCallEventAny, resolvedSid, {
             outputTokens,
             inputTokens,
             cacheReadTokens,
             cacheWriteTokens,
-            latency: Date.now() - Number(sessionStart)
-          })
+            latency: Date.now() - Number(sessionStart),
+          });
           if (errEvent) {
-            hasStoreError = true
-            yield errEvent
-            break
+            hasStoreError = true;
+            yield errEvent;
+            break;
           }
           if (toolCall.name != "skills") {
-            const toolCallEvent: AgentEvent = { type: "tool.call", timestamp: new Date(), input: JSON.parse(toolCall.arguments), name: toolCall.name, turnId, sessionId: resolvedSid, toolCallId: toolCall.id }
-            yield toolCallEvent
+            const toolCallEvent: AgentEvent = {
+              type: "tool.call",
+              timestamp: new Date(),
+              input: JSON.parse(toolCall.arguments),
+              name: toolCall.name,
+              turnId,
+              sessionId: resolvedSid,
+              toolCallId: toolCall.id,
+            };
+            yield toolCallEvent;
           } else {
-            const payload: { skill_name: string } = JSON.parse(toolCall.arguments)
-            const skillLoadEvent: AgentEvent = { type: "skill.load", timestamp: new Date(), turnId, sessionId: resolvedSid,  skillName: payload.skill_name }
-            yield skillLoadEvent
+            const payload: { skill_name: string } = JSON.parse(
+              toolCall.arguments,
+            );
+            const skillLoadEvent: AgentEvent = {
+              type: "skill.load",
+              timestamp: new Date(),
+              turnId,
+              sessionId: resolvedSid,
+              skillName: payload.skill_name,
+            };
+            yield skillLoadEvent;
           }
           switch (toolCall.name) {
             case "shell": {
-              promises.push(limit(() => executeToolWithCallId(this.tools.shell.execute.bind(this.tools.shell), toolCall.arguments, toolCall.id)))
-              break
+              promises.push(
+                limit(() =>
+                  executeToolWithCallId(
+                    this.tools.shell.execute.bind(this.tools.shell),
+                    toolCall.arguments,
+                    toolCall.id,
+                  )
+                ),
+              );
+              break;
             }
             case "edit":
-              promises.push(limit(() => executeToolWithCallId(this.tools.edit.execute.bind(this.tools.edit), toolCall.arguments, toolCall.id)))
-              break
+              promises.push(
+                limit(() =>
+                  executeToolWithCallId(
+                    this.tools.edit.execute.bind(this.tools.edit),
+                    toolCall.arguments,
+                    toolCall.id,
+                  )
+                ),
+              );
+              break;
             case "write":
-              promises.push(limit(() => executeToolWithCallId(this.tools.write.execute.bind(this.tools.write), toolCall.arguments, toolCall.id)))
-              break
+              promises.push(
+                limit(() =>
+                  executeToolWithCallId(
+                    this.tools.write.execute.bind(this.tools.write),
+                    toolCall.arguments,
+                    toolCall.id,
+                  )
+                ),
+              );
+              break;
             case "read":
-              promises.push(limit(() => executeToolWithCallId(this.tools.read.execute.bind(this.tools.read), toolCall.arguments, toolCall.id)))
-              break
+              promises.push(
+                limit(() =>
+                  executeToolWithCallId(
+                    this.tools.read.execute.bind(this.tools.read),
+                    toolCall.arguments,
+                    toolCall.id,
+                  )
+                ),
+              );
+              break;
             case "skills":
-              promises.push(limit(() => executeToolWithCallId(this.tools.skills.execute.bind(this.tools.skills), toolCall.arguments, toolCall.id)))
-              break
+              promises.push(
+                limit(() =>
+                  executeToolWithCallId(
+                    this.tools.skills.execute.bind(this.tools.skills),
+                    toolCall.arguments,
+                    toolCall.id,
+                  )
+                ),
+              );
+              break;
             case "mcp":
-              promises.push(limit(() => executeToolWithCallId(this.tools.mcp!.execute.bind(this.tools.mcp!), toolCall.arguments, toolCall.id)))
-              break
+              promises.push(
+                limit(() =>
+                  executeToolWithCallId(
+                    this.tools.mcp!.execute.bind(this.tools.mcp!),
+                    toolCall.arguments,
+                    toolCall.id,
+                  )
+                ),
+              );
+              break;
           }
         }
       }
 
       if (hasStoreError) {
-        break
+        break;
       }
 
-      const results = await Promise.all(promises)
+      const results = await Promise.all(promises);
 
       for (const result of results) {
         const toolResultEvent: AgentEvent = {
@@ -550,30 +716,32 @@ export class LocalLightAgent {
           timestamp: new Date(),
           result: result.result,
           sessionId: resolvedSid,
-          turnId
-        }
+          turnId,
+        };
         errEvent = await this.safeStore(toolResultEvent, resolvedSid, {
           inputTokens,
           outputTokens,
           cacheWriteTokens,
           cacheReadTokens,
-          latency: Date.now() - Number(sessionStart)
-        })
+          latency: Date.now() - Number(sessionStart),
+        });
         if (errEvent) {
-          yield errEvent
-          break
+          yield errEvent;
+          break;
         }
-        yield toolResultEvent
+        yield toolResultEvent;
         this.history.push({
           role: "tool" as MessageRole,
           content: [{
             type: "toolResult",
-            result: result.result.type === "success" ? result.result.result : `ERROR!\n${result.result.error}`,
+            result: result.result.type === "success"
+              ? result.result.result
+              : `ERROR!\n${result.result.error}`,
             toolCallId: result.callId,
-          }]
-        })
+          }],
+        });
       }
     }
-    return
+    return;
   }
 }

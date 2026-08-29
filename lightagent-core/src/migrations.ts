@@ -1,10 +1,14 @@
 import type { FileSystem } from "./fs.ts";
 import type { SqliteClient } from "./storage.ts";
-import * as path from "@std/path"
+import * as path from "@std/path";
 
-async function getMigrations(fs: FileSystem): Promise<{ version: number; sql: string }[]> {
+async function getMigrations(
+  fs: FileSystem,
+): Promise<{ version: number; sql: string }[]> {
   const migrations: { version: number; sql: string }[] = [];
-  const migrationsDir = path.fromFileUrl(new URL("./migrations", import.meta.url));
+  const migrationsDir = path.fromFileUrl(
+    new URL("./migrations", import.meta.url),
+  );
   for await (const entry of fs.readDir(migrationsDir)) {
     if (entry.name.endsWith(".sql")) {
       const sql = await fs.readToString(path.join(migrationsDir, entry.name));
@@ -34,7 +38,10 @@ async function getCurrentMigration(db: SqliteClient): Promise<number> {
   return version.version;
 }
 
-export async function applyMigrations(db: SqliteClient, fs: FileSystem): Promise<void> {
+export async function applyMigrations(
+  db: SqliteClient,
+  fs: FileSystem,
+): Promise<void> {
   const migrations = await getMigrations(fs);
   const currentVersion = await getCurrentMigration(db);
   const toApply = migrations.filter((m) => m.version > currentVersion);

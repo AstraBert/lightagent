@@ -8,14 +8,14 @@ import {
 import { error } from "node:console";
 
 const SessionInitTypeSchema = v.picklist(["new", "resume"]);
-export type SessionInitType = v.InferOutput<typeof SessionInitTypeSchema>
+export type SessionInitType = v.InferOutput<typeof SessionInitTypeSchema>;
 const ProviderSchema = v.picklist(["anthropic", "openai"]);
 export type Provider = v.InferOutput<typeof ProviderSchema>;
 const DeltaTypeSchema = v.picklist(["text", "thinking"]);
 export type DeltaType = v.InferOutput<typeof DeltaTypeSchema>;
 
 export function isProvider(value: unknown): value is Provider {
-  return v.is(ProviderSchema, value)
+  return v.is(ProviderSchema, value);
 }
 
 export type JsonData =
@@ -38,9 +38,15 @@ const JsonValueSchema: v.GenericSchema<JsonData> = v.lazy(() =>
 export type JsonValue = v.InferOutput<typeof JsonValueSchema>;
 
 export const CompactionResultSchema = v.object({
-  title: v.pipe(v.string(), v.description("The title for the session, based on its content")),
-  summary: v.pipe(v.string(), v.description("Summary of the conversation, based on the provided prompt"))
-})
+  title: v.pipe(
+    v.string(),
+    v.description("The title for the session, based on its content"),
+  ),
+  summary: v.pipe(
+    v.string(),
+    v.description("Summary of the conversation, based on the provided prompt"),
+  ),
+});
 
 const ToolResultSchema = v.union([
   v.object({ type: v.literal("success"), result: v.string() }),
@@ -72,7 +78,9 @@ const AssistantMessagePartSchema = v.union([
   ToolCallPartSchema,
 ]);
 
-export type AssistantMessagePart = v.InferOutput<typeof AssistantMessagePartSchema>
+export type AssistantMessagePart = v.InferOutput<
+  typeof AssistantMessagePartSchema
+>;
 
 const UsageSchema = v.object({
   latency: v.number(),
@@ -82,7 +90,7 @@ const UsageSchema = v.object({
   cacheReadTokens: v.number(),
 });
 
-export type Usage = v.InferOutput<typeof UsageSchema>
+export type Usage = v.InferOutput<typeof UsageSchema>;
 
 const SessionInitEventSchema = v.object({
   type: v.literal("session.init"),
@@ -180,8 +188,8 @@ const MemoryStorageEventSchema = v.object({
   timestamp: v.date(),
   success: v.boolean(),
   error: v.optional(v.string()),
-})
-export type MemoryStorageEvent = v.InferOutput<typeof MemoryStorageEventSchema>
+});
+export type MemoryStorageEvent = v.InferOutput<typeof MemoryStorageEventSchema>;
 
 export const AgentEventSchema = v.union([
   SessionInitEventSchema,
@@ -197,47 +205,69 @@ export const AgentEventSchema = v.union([
 ]);
 export type AgentEvent = v.InferOutput<typeof AgentEventSchema>;
 
-export function messageToAssistantContent(parts: MessagePart[]): AssistantMessagePart[] {
-  const content: AssistantMessagePart[] = []
+export function messageToAssistantContent(
+  parts: MessagePart[],
+): AssistantMessagePart[] {
+  const content: AssistantMessagePart[] = [];
 
   for (const part of parts) {
     switch (part.type) {
       case "text":
-        content.push({type: "text", text: part.text})
-        break
+        content.push({ type: "text", text: part.text });
+        break;
       case "thinking":
-        content.push({type: "thinking", thinking: part.thinking, signature: part.signature })
-        break
+        content.push({
+          type: "thinking",
+          thinking: part.thinking,
+          signature: part.signature,
+        });
+        break;
       case "toolCall":
-        content.push({type: "toolCall", arguments: part.arguments, id: part.id, name: part.name })
-        break
+        content.push({
+          type: "toolCall",
+          arguments: part.arguments,
+          id: part.id,
+          name: part.name,
+        });
+        break;
       default:
-        continue
+        continue;
     }
   }
 
-  return content
+  return content;
 }
 
-export function assistantContentToMessage(content: AssistantMessagePart[]): Message {
-  const parts: MessagePart[] = []
+export function assistantContentToMessage(
+  content: AssistantMessagePart[],
+): Message {
+  const parts: MessagePart[] = [];
   for (const c of content) {
     switch (c.type) {
       case "text":
-        parts.push({type: "text", text: c.text})
-        break
+        parts.push({ type: "text", text: c.text });
+        break;
       case "thinking":
-        parts.push({type: "thinking", thinking: c.thinking, signature: c.signature})
-        break
+        parts.push({
+          type: "thinking",
+          thinking: c.thinking,
+          signature: c.signature,
+        });
+        break;
       case "toolCall":
-        parts.push({type: "toolCall", arguments: c.arguments, id: c.id, name: c.name})
-        break
+        parts.push({
+          type: "toolCall",
+          arguments: c.arguments,
+          id: c.id,
+          name: c.name,
+        });
+        break;
     }
   }
   return {
     role: "assistant" as MessageRole,
     content: parts,
-  }
+  };
 }
 
 /* Convert persisted `AgentEvent`s back into llms-sdk `Message`s.
@@ -276,14 +306,15 @@ export function convertEventsToMessages(events: AgentEvent[]): Message[] {
         messages.push({ role: "assistant" as MessageRole, content: parts });
         break;
       }
-      case "tool.call_any":  {
+      case "tool.call_any": {
         if (messages.length > 0) {
-          const lastMessage = messages.at(messages.length - 1)!
+          const lastMessage = messages.at(messages.length - 1)!;
           if (lastMessage.role === "assistant" as MessageRole) {
-            const tcs = lastMessage.content.filter((p) => p.type === "toolCall").map((t) => t.id)
+            const tcs = lastMessage.content.filter((p) => p.type === "toolCall")
+              .map((t) => t.id);
             if (tcs.includes(event.toolCallId)) {
               // tool call already recorded in previous message
-              break
+              break;
             }
           }
         }

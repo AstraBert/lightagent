@@ -1,29 +1,34 @@
-import { FileSystem, DirEntry, FileInfo, FileNotFoundError } from "@cle-does-things/lightagent-core";
+import {
+  DirEntry,
+  FileInfo,
+  FileNotFoundError,
+  FileSystem,
+} from "@cle-does-things/lightagent-core";
 import { LocalEnvironment } from "./environment.ts";
 
 export class LocalFileSystem implements FileSystem {
-  env: LocalEnvironment = new LocalEnvironment()
+  env: LocalEnvironment = new LocalEnvironment();
 
   async readToString(path: string): Promise<string> {
-    return await Deno.readTextFile(path)
+    return await Deno.readTextFile(path);
   }
 
   async write(path: string, content: string) {
-    return await Deno.writeTextFile(path, content)
+    return await Deno.writeTextFile(path, content);
   }
 
   readDir(path: string): AsyncIterable<DirEntry> {
-    return Deno.readDir(path)
+    return Deno.readDir(path);
   }
 
   async stat(path: string): Promise<FileInfo> {
     try {
-      return await Deno.stat(path)
+      return await Deno.stat(path);
     } catch (e) {
       if (e instanceof Deno.errors.NotFound) {
-        throw new FileNotFoundError(e.message)
+        throw new FileNotFoundError(e.message);
       }
-      throw e
+      throw e;
     }
   }
 
@@ -32,10 +37,10 @@ export class LocalFileSystem implements FileSystem {
   }
 
   cwd(): string {
-    return Deno.cwd()
+    return Deno.cwd();
   }
 
   async mkdir(path: string, recursive: boolean): Promise<void> {
-    return await Deno.mkdir(path, { recursive })
+    return await Deno.mkdir(path, { recursive });
   }
 }

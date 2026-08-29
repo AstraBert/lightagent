@@ -40,7 +40,7 @@ export abstract class ToolFunction<Ctx> {
   }
 
   constructor(ctx: Ctx) {
-    this.ctx = ctx
+    this.ctx = ctx;
   }
 }
 
@@ -53,7 +53,7 @@ export class SkillsTool extends ToolFunction<SkillsClient> {
   });
 
   constructor(ctx: SkillsClient) {
-    super(ctx)
+    super(ctx);
   }
 
   async execute(input: JsonValue): Promise<ToolResult> {
@@ -77,25 +77,35 @@ export class ReadTool extends ToolFunction<FileSystem> {
     "Call this tool to read a text-based file, optionally with an offset and maximum number of characters to read";
   readonly inputSchema = v.object({
     file_path: v.pipe(v.string(), v.description("Path of the file to read")),
-    offset: v.pipe(v.optional(v.number()), v.description("Read the file starting from this offset. Defaults to zero.")),
-    max_chars: v.pipe(v.optional(v.number()), v.description("Maximum number of characters to read from the offset. Reads the file to the end by default."))
+    offset: v.pipe(
+      v.optional(v.number()),
+      v.description(
+        "Read the file starting from this offset. Defaults to zero.",
+      ),
+    ),
+    max_chars: v.pipe(
+      v.optional(v.number()),
+      v.description(
+        "Maximum number of characters to read from the offset. Reads the file to the end by default.",
+      ),
+    ),
   });
 
   constructor(ctx: FileSystem) {
-    super(ctx)
+    super(ctx);
   }
 
   async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const cwd = this.ctx.cwd()
-      const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
-      let content = await this.ctx.readToString(resolved)
+      const cwd = this.ctx.cwd();
+      const resolved = assertFileWithinWorkspace(validated.file_path, cwd);
+      let content = await this.ctx.readToString(resolved);
       if (typeof validated.offset !== "undefined") {
-        content = content.slice(validated.offset)
+        content = content.slice(validated.offset);
       }
       if (typeof validated.max_chars !== "undefined") {
-        content = content.slice(0, validated.max_chars)
+        content = content.slice(0, validated.max_chars);
       }
       return { type: "success", result: content };
     } catch (e) {
@@ -107,7 +117,6 @@ export class ReadTool extends ToolFunction<FileSystem> {
   }
 }
 
-
 export class WriteTool extends ToolFunction<FileSystem> {
   readonly name: string = "write";
   readonly description: string =
@@ -118,16 +127,19 @@ export class WriteTool extends ToolFunction<FileSystem> {
   });
 
   constructor(ctx: FileSystem) {
-    super(ctx)
+    super(ctx);
   }
 
   async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const cwd = this.ctx.cwd()
-      const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
+      const cwd = this.ctx.cwd();
+      const resolved = assertFileWithinWorkspace(validated.file_path, cwd);
       await this.ctx.write(resolved, validated.content);
-      return { type: "success", result: `Wrote ${validated.content.length} characters to ${resolved}` };
+      return {
+        type: "success",
+        result: `Wrote ${validated.content.length} characters to ${resolved}`,
+      };
     } catch (e) {
       return {
         type: "error",
@@ -143,13 +155,26 @@ export class EditTool extends ToolFunction<FileSystem> {
     "Edit a text-based file by replacing an old string with a new one.";
   readonly inputSchema = v.object({
     file_path: v.pipe(v.string(), v.description("Path of the file to edit")),
-    old_string: v.pipe(v.string(), v.description("Old string to replace. Must be unique unless `replace_all` is set to True.")),
-    new_string: v.pipe(v.string(), v.description("New string to replace the old with")),
-    replace_all: v.pipe(v.optional(v.boolean()), v.description("Replace all the occurrences of `old_string` with `new_string`. Defaults to False (checks if `old_string` is unique, fails if not)"))
+    old_string: v.pipe(
+      v.string(),
+      v.description(
+        "Old string to replace. Must be unique unless `replace_all` is set to True.",
+      ),
+    ),
+    new_string: v.pipe(
+      v.string(),
+      v.description("New string to replace the old with"),
+    ),
+    replace_all: v.pipe(
+      v.optional(v.boolean()),
+      v.description(
+        "Replace all the occurrences of `old_string` with `new_string`. Defaults to False (checks if `old_string` is unique, fails if not)",
+      ),
+    ),
   });
 
   constructor(ctx: FileSystem) {
-    super(ctx)
+    super(ctx);
   }
 
   async execute(input: JsonValue): Promise<ToolResult> {
@@ -158,17 +183,20 @@ export class EditTool extends ToolFunction<FileSystem> {
       if (validated.old_string === "") {
         return {
           type: "error",
-          error: "`old_string` should not be empty"
-        }
+          error: "`old_string` should not be empty",
+        };
       }
-      const cwd = this.ctx.cwd()
-      const resolved = assertFileWithinWorkspace(validated.file_path, cwd)
+      const cwd = this.ctx.cwd();
+      const resolved = assertFileWithinWorkspace(validated.file_path, cwd);
       let content = await this.ctx.readToString(resolved);
       if (validated.replace_all) {
-        content = content.replaceAll(validated.old_string, validated.new_string)
+        content = content.replaceAll(
+          validated.old_string,
+          validated.new_string,
+        );
       } else {
-        assertUniqueString(content, validated.old_string)
-        content = content.replace(validated.old_string, validated.new_string)
+        assertUniqueString(content, validated.old_string);
+        content = content.replace(validated.old_string, validated.new_string);
       }
       await this.ctx.write(resolved, content);
       return { type: "success", result: `Edited ${resolved}` };
@@ -187,42 +215,56 @@ export class ShellTool extends ToolFunction<Shell> {
     "Execute a shell command, with an optional timeout. Do not use this tool to perform destructive and irreversible operations such `rm -rf /`";
   readonly inputSchema = v.object({
     command: v.pipe(v.string(), v.description("Command executable to run")),
-    args: v.pipe(v.array(v.string()), v.description("Arguments for the executable")),
-    timeout: v.pipe(v.optional(v.number()), v.description("Timeout (in seconds) for the shell command. Defaults to 60 seconds."))
-  })
+    args: v.pipe(
+      v.array(v.string()),
+      v.description("Arguments for the executable"),
+    ),
+    timeout: v.pipe(
+      v.optional(v.number()),
+      v.description(
+        "Timeout (in seconds) for the shell command. Defaults to 60 seconds.",
+      ),
+    ),
+  });
 
   constructor(ctx: Shell) {
-    super(ctx)
+    super(ctx);
   }
 
   override async execute(input: JsonValue): Promise<ToolResult> {
     try {
-      const validated = v.parse(this.inputSchema, input)
-        const { code, stdout, stderr, success, timedOut } = await this.ctx.exec(validated.command, validated.timeout ?? 60, {
+      const validated = v.parse(this.inputSchema, input);
+      const { code, stdout, stderr, success, timedOut } = await this.ctx.exec(
+        validated.command,
+        validated.timeout ?? 60,
+        {
           args: validated.args,
           stdout: "piped",
           stderr: "piped",
-          stdin: "null"
-        })
+          stdin: "null",
+        },
+      );
 
-        if (timedOut) {
-          return {
-            type: "error",
-            error: `Command timed out after ${validated.timeout ?? 60}s`
-          }
-        }
+      if (timedOut) {
+        return {
+          type: "error",
+          error: `Command timed out after ${validated.timeout ?? 60}s`,
+        };
+      }
 
-        if (success) {
-          return {
-            type: "success",
-            result: `Command exited with ${code}.\n\nSTDOUT:\n\n${stdout}\n\nSTDERR:\n\n${stderr}`
-          }
-        } else {
-          return {
-            type: "error",
-            error: `Command exited with ${code}.\n\nSTDOUT:\n\n${stdout}\n\nSTDERR:\n\n${stderr}`
-          }
-        }
+      if (success) {
+        return {
+          type: "success",
+          result:
+            `Command exited with ${code}.\n\nSTDOUT:\n\n${stdout}\n\nSTDERR:\n\n${stderr}`,
+        };
+      } else {
+        return {
+          type: "error",
+          error:
+            `Command exited with ${code}.\n\nSTDOUT:\n\n${stdout}\n\nSTDERR:\n\n${stderr}`,
+        };
+      }
     } catch (e) {
       return {
         type: "error",
@@ -237,38 +279,72 @@ export class McpTool extends ToolFunction<McpClient> {
   readonly description: string =
     "Discover local and remote MCP servers, and call their tools";
   readonly inputSchema = v.object({
-    list: v.pipe(v.optional(v.object({})), v.description("List all available servers")),
-    tools: v.pipe(v.optional(v.object({
-      serverNames: v.pipe(v.optional(v.array(v.string())), v.description("Names of the servers whose tools should be listed. If not provided, lists tools from all servers."))
-    })), v.description("List the tools of one of all servers")),
+    list: v.pipe(
+      v.optional(v.object({})),
+      v.description("List all available servers"),
+    ),
+    tools: v.pipe(
+      v.optional(v.object({
+        serverNames: v.pipe(
+          v.optional(v.array(v.string())),
+          v.description(
+            "Names of the servers whose tools should be listed. If not provided, lists tools from all servers.",
+          ),
+        ),
+      })),
+      v.description("List the tools of one of all servers"),
+    ),
     call: v.pipe(v.optional(v.object({
-      serverName: v.pipe(v.string(), v.description("Name of the server the tool belongs to")),
+      serverName: v.pipe(
+        v.string(),
+        v.description("Name of the server the tool belongs to"),
+      ),
       toolName: v.pipe(v.string(), v.description("Name of the tool to call")),
-      toolInput: v.pipe(v.string(), v.description("Stringified representation of the tool JSON input"))
-    })))
-  })
+      toolInput: v.pipe(
+        v.string(),
+        v.description("Stringified representation of the tool JSON input"),
+      ),
+    }))),
+  });
 
   constructor(ctx: McpClient) {
-    super(ctx)
+    super(ctx);
   }
 
   async execute(input: JsonValue): Promise<ToolResult> {
     try {
-      const validated = v.parse(this.inputSchema, input)
-      const onlyOneReq = [typeof validated.list, typeof validated.call, typeof validated.tools].filter((m) => m !== "undefined").length === 1
+      const validated = v.parse(this.inputSchema, input);
+      const onlyOneReq =
+        [typeof validated.list, typeof validated.call, typeof validated.tools]
+          .filter((m) => m !== "undefined").length === 1;
       if (!onlyOneReq) {
-        return { type: "error", error: "You can only request one of the three available actions, the other two must stay unset." }
+        return {
+          type: "error",
+          error:
+            "You can only request one of the three available actions, the other two must stay unset.",
+        };
       }
       if (typeof validated.list !== "undefined") {
-        return { type: "success", result: Object.keys(this.ctx.servers).join(", ") }
+        return {
+          type: "success",
+          result: Object.keys(this.ctx.servers).join(", "),
+        };
       } else if (validated.tools) {
-        const tools = await this.ctx.listTools(validated.tools.serverNames)
-        return { type: "success", result: tools }
+        const tools = await this.ctx.listTools(validated.tools.serverNames);
+        return { type: "success", result: tools };
       } else if (validated.call) {
-        const result = await this.ctx.callTool(validated.call.serverName, validated.call.toolName, validated.call.toolInput)
-        return result
+        const result = await this.ctx.callTool(
+          validated.call.serverName,
+          validated.call.toolName,
+          validated.call.toolInput,
+        );
+        return result;
       } else {
-        return { type: "error", error: "You did not request any action (list, tools, call) from this tool, and you need to request exactly one."}
+        return {
+          type: "error",
+          error:
+            "You did not request any action (list, tools, call) from this tool, and you need to request exactly one.",
+        };
       }
     } catch (e) {
       return {

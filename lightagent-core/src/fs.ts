@@ -25,29 +25,29 @@ export interface FileInfo {
 }
 
 export interface DirEntry {
-  name: string,
-  isFile: boolean,
-  isDirectory: boolean,
-  isSymlink: boolean,
+  name: string;
+  isFile: boolean;
+  isDirectory: boolean;
+  isSymlink: boolean;
 }
 
 export class FileNotFoundError extends Error {
   constructor(message: string) {
-    super(message)
+    super(message);
     this.name = "FileNotFoundError";
     Object.setPrototypeOf(this, FileNotFoundError.prototype);
   }
 }
 
 export interface FileSystem {
-  env: Environment
-  readToString: (path: string) => Promise<string>,
-  readDir: (path: string) => AsyncIterable<DirEntry>,
-  write: (path: string, content: string) => Promise<void>,
-  stat: (path: string) => Promise<FileInfo>,
-  homeDir: () => string | undefined,
-  cwd: () => string,
-  mkdir: (path: string, recursive: boolean) => Promise<void>
+  env: Environment;
+  readToString: (path: string) => Promise<string>;
+  readDir: (path: string) => AsyncIterable<DirEntry>;
+  write: (path: string, content: string) => Promise<void>;
+  stat: (path: string) => Promise<FileInfo>;
+  homeDir: () => string | undefined;
+  cwd: () => string;
+  mkdir: (path: string, recursive: boolean) => Promise<void>;
 }
 
 export async function exists(path: string, fs: FileSystem): Promise<boolean> {

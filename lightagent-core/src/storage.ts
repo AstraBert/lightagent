@@ -3,37 +3,38 @@ import * as v from "valibot";
 import type { FileSystem } from "./fs.ts";
 import { applyMigrations } from "./migrations.ts";
 
-export type SqlBindValue = number
-| string
-| symbol
-| bigint
-| boolean
-| null
-| undefined
-| Date
-| Uint8Array
-| SqlBindValue[]
-| { [key: string]: SqlBindValue; }
+export type SqlBindValue =
+  | number
+  | string
+  | symbol
+  | bigint
+  | boolean
+  | null
+  | undefined
+  | Date
+  | Uint8Array
+  | SqlBindValue[]
+  | { [key: string]: SqlBindValue };
 
-export type SqlBindParameters = SqlBindValue[] | [SqlBindParameters]
+export type SqlBindParameters = SqlBindValue[] | [SqlBindParameters];
 
 /* SQL statement, resulting from a `prepare` operation */
 export interface SqlStatement<T> {
   /* Fetch all records associated with the statement */
-  all(...parameters: SqlBindParameters): T[],
+  all(...parameters: SqlBindParameters): T[];
   /* Fetch the first record associated with the statement, if any */
-  get(...parameters: SqlBindParameters): T | undefined
+  get(...parameters: SqlBindParameters): T | undefined;
 }
 
 export interface SqliteClient {
   /* Execute a non-readonly SQL statement, optionally specifying bind parameters */
-  exec(sql: string, ...parameters: SqlBindParameters): Promise<void>,
+  exec(sql: string, ...parameters: SqlBindParameters): Promise<void>;
   /* Execute a `select` statement, optionally specifying bind parameters */
-  prepare<T extends object>(sql: string): Promise<SqlStatement<T>>,
+  prepare<T extends object>(sql: string): Promise<SqlStatement<T>>;
 }
 
 export class AgentStorage {
-  private fs: FileSystem
+  private fs: FileSystem;
   private db: SqliteClient;
   private initialized: boolean;
 
@@ -62,13 +63,18 @@ export class AgentStorage {
     );
   }
 
-  async getSessionEvents(sessionId: string, afterTimestamp?: number): Promise<AgentEvent[]> {
+  async getSessionEvents(
+    sessionId: string,
+    afterTimestamp?: number,
+  ): Promise<AgentEvent[]> {
     await this.initStorage();
-    let sql = "select payload from events where session_id = :sessionId order by id, created_at"
-    let params: Record<string, string | number> = { sessionId }
+    let sql =
+      "select payload from events where session_id = :sessionId order by id, created_at";
+    let params: Record<string, string | number> = { sessionId };
     if (afterTimestamp) {
-      sql = "select payload from events where session_id = :sessionId and created_at > :timestamp order by id, created_at"
-      params = { sessionId, timestamp: afterTimestamp }
+      sql =
+        "select payload from events where session_id = :sessionId and created_at > :timestamp order by id, created_at";
+      params = { sessionId, timestamp: afterTimestamp };
     }
     const stmt = await this.db.prepare<{ payload: string }>(sql);
     const events = stmt.all(params);
