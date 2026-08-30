@@ -37,7 +37,7 @@ deno task build
 ./lightagent-cli --help
 ```
 
-You can also download the binary from the [releases page](https://github.com/AstraBer/lightagent/releases)
+You can also download the binary from the [releases page](https://github.com/AstraBert/lightagent/releases)
 
 ### `lightagent-do`
 
