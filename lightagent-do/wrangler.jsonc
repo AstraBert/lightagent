@@ -1,6 +1,6 @@
 {
   "name": "lightagent-do",
-  "main": "src/index.ts",
+  "main": "dist/bundle.js",
   "compatibility_date": "2026-01-01",
   "d1_databases": [
     {

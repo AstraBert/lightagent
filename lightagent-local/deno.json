@@ -1,7 +1,7 @@
 {
   "tasks": {
     "dev": "deno run --allow-net --allow-env --allow-ffi --allow-read --allow-run --allow-write src/main.ts",
-    "build": "deno compile -A -o lightagent-cli src/main.ts"
+    "build": "deno compile -A -o lightagent-cli --no-lock --reload --exclude-unused-npm src/main.ts"
   },
   "imports": {
     "@db/sqlite": "jsr:@db/sqlite@^0.13.0",

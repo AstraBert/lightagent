@@ -8,7 +8,7 @@ import {
 
 export class DOFileSystem implements FileSystem {
   env: Environment | undefined = undefined;
-  private baseDir: string
+  baseDir: string
   private base: R2Bucket
 
   constructor(base: R2Bucket, cwd?: string) {
@@ -72,7 +72,7 @@ export class DOFileSystem implements FileSystem {
     const prefix = this.pathToKey(path).replace(/\/?$/, "/")
     let cursor: string | undefined
     do {
-      const listed = await this.base.list({prefix, delimiter: "/"})
+      const listed = await this.base.list({prefix, delimiter: "/", cursor})
       for (const p of listed.delimitedPrefixes ?? []) {
         yield { name: p.slice(prefix.length, -1), isFile: false, isDirectory: true, isSymlink: false };
       }

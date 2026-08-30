@@ -11,6 +11,58 @@ import * as v from "valibot";
 
 const VERSION = "0.1.0";
 
+const HELP_MESSAGE = `
+\x1b[1;36mLightAgent CLI v${VERSION}\x1b[0m
+
+A lightweight CLI agent built on Deno.
+
+\x1b[1mUSAGE:\x1b[0m
+    lightagent-cli --model <MODEL> [OPTIONS]
+
+\x1b[1mREQUIRED:\x1b[0m
+    --model <MODEL>           The model to use (e.g., gpt-4, claude-3-opus)
+
+\x1b[1mPROVIDER OPTIONS:\x1b[0m
+    --provider <PROVIDER>     LLM provider: openai, anthropic (default: auto-detect)
+    --api-key <KEY>           API key for the provider
+    --base-url <URL>          Custom base URL for the API
+
+\x1b[1mAGENT OPTIONS:\x1b[0m
+    --system <PROMPT>         Custom system prompt
+    --append-system           Append to default system prompt instead of replacing
+    --parallel-tool-calls     Enable parallel tool calls (default: false)
+    --no-prompt-caching       Disable prompt caching (default: enabled)
+
+\x1b[1mSKILLS & MCP:\x1b[0m
+    --skill <SKILL>           Add a skill (can be used multiple times)
+    --no-discover-skills      Disable automatic skill discovery (default: enabled)
+    --mcps-file <FILE>        Path to MCP servers configuration JSON file
+
+\x1b[1mSESSION OPTIONS:\x1b[0m
+    --session-id <ID>         Resume an existing session
+    --prompt <PROMPT>         Run in headless mode with the given prompt
+    --json                    Output events as JSON (useful for scripting)
+
+\x1b[1mGENERAL:\x1b[0m
+    -h, --help                Show this help message
+    -v, --version             Show version
+
+\x1b[1mEXAMPLES:\x1b[0m
+    # Interactive mode
+    lightagent-cli --model gpt-5.6-terra
+
+    # Headless mode with a specific prompt
+    lightagent-cli --model claude-sonnet-5 --prompt "Hello, world!"
+
+    # With custom system prompt and skills
+    lightagent-cli --model gpt-5.6-terra --system "You are a helpful assistant" --skill web-search
+
+    # Resume a previous session
+    lightagent-cli --model gpt-5.6-terra --session-id abc123
+
+\x1b[2mNote: This is alpha software. Expect changes and bugs!\x1b[0m
+`;
+
 if (import.meta.main) {
   const cmdOptions = parseArgs(Deno.args, {
     string: [
@@ -30,7 +82,13 @@ if (import.meta.main) {
       "prompt-caching",
       "discover-skills",
       "json",
+      "help",
+      "version",
     ],
+    alias: {
+      help: "h",
+      version: "v",
+    },
     negatable: ["prompt-caching", "discover-skills"],
     collect: ["skill"],
     default: {
@@ -47,13 +105,27 @@ if (import.meta.main) {
       "session-id": undefined,
       "discover-skills": true,
       json: false,
+      help: false,
+      version: false,
     },
   });
 
+  // Handle --help and --version
+  if (cmdOptions.help) {
+    console.log(HELP_MESSAGE);
+    Deno.exit(0);
+  }
+
+  if (cmdOptions.version) {
+    console.log(`lightagent-cli v${VERSION}`);
+    Deno.exit(0);
+  }
+
   if (!cmdOptions.model) {
     console.error(
-      "\x1b[1;31mERROR! Missing required option `--model`\x1b[1;39m",
+      "\x1b[1;31mERROR! Missing required option `--model`\x1b[1;39m\n",
     );
+    console.error("Run with --help for usage information.");
     Deno.exit(1);
   }
 
