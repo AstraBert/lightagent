@@ -8,10 +8,12 @@ import {
 
 export class DOFileSystem implements FileSystem {
   env: Environment | undefined = undefined;
+  private baseDir: string
   private base: R2Bucket
 
-  constructor(base: R2Bucket) {
+  constructor(base: R2Bucket, cwd?: string) {
     this.base = base
+    this.baseDir = cwd ?? "/"
   }
 
   async readToString(path: string): Promise<string> {
@@ -26,7 +28,7 @@ export class DOFileSystem implements FileSystem {
   }
 
   cwd(): string {
-    return "/"
+    return this.baseDir
   }
 
   homeDir(): string {
@@ -68,13 +70,42 @@ export class DOFileSystem implements FileSystem {
 
   async *readDir(path: string): AsyncIterable<DirEntry> {
     const prefix = this.pathToKey(path).replace(/\/?$/, "/")
-    const listed = await this.base.list({prefix, delimiter: "/"})
-    for (const p of listed.delimitedPrefixes ?? []) {
-      yield { name: p.slice(prefix.length, -1), isFile: false, isDirectory: true, isSymlink: false };
+    let cursor: string | undefined
+    do {
+      const listed = await this.base.list({prefix, delimiter: "/"})
+      for (const p of listed.delimitedPrefixes ?? []) {
+        yield { name: p.slice(prefix.length, -1), isFile: false, isDirectory: true, isSymlink: false };
+      }
+      for (const obj of listed.objects) {
+        yield { name: obj.key.slice(prefix.length), isFile: true, isDirectory: false, isSymlink: false };
+      }
+      cursor = listed.truncated ? listed.cursor : undefined
+    } while (cursor)
+  }
+
+  async readLines(path: string, nLines: number): Promise<string[]> {
+    const obj = await this.base.get(this.pathToKey(path));
+    if (!obj) throw new FileNotFoundError(`No such file: ${path}`);
+
+    const lines: string[] = [];
+    let buffer = "";
+    const reader = obj.body.pipeThrough(new TextDecoderStream()).getReader();
+
+    try {
+      while (lines.length < nLines) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        let idx: number;
+        while (lines.length < nLines && (idx = buffer.indexOf("\n")) !== -1) {
+          lines.push(buffer.slice(0, idx));
+          buffer = buffer.slice(idx + 1);
+        }
+      }
+    } finally {
+      await reader.cancel(); // stop pulling more of the stream once satisfied
     }
-    for (const obj of listed.objects) {
-      yield { name: obj.key.slice(prefix.length), isFile: true, isDirectory: false, isSymlink: false };
-    }
+    return lines;
   }
 
   private pathToKey(path: string): string {

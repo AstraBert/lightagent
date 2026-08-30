@@ -3,7 +3,9 @@
     "dev": "deno run --watch --allow-net main.ts"
   },
   "imports": {
-    "@cloudflare/workers-types": "npm:@cloudflare/workers-types@^5.20260828.1"
+    "@cloudflare/workers-types": "npm:@cloudflare/workers-types@^5.20260828.1",
+    "@libs/diff": "jsr:@libs/diff@^4.0.0",
+    "isomorphic-git": "npm:isomorphic-git@^1.41.9"
   },
   "compilerOptions": {
     "types": ["@cloudflare/workers-types"]

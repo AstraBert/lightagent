@@ -4,7 +4,7 @@ import { toJsonSchema } from "@valibot/to-json-schema";
 import type { Tool } from "@cle-does-things/llms-sdk";
 import type { JsonValue, ToolResult } from "./events.ts";
 import type { SkillsClient } from "./skills.ts";
-import { assertFileWithinWorkspace, assertUniqueString } from "./assertions.ts";
+import { assertFileWithinWorkspace, assertOnlyOneDefined, assertUniqueString } from "./assertions.ts";
 import type { FileSystem } from "./fs.ts";
 import type { Shell } from "./shell.ts";
 import type { McpClient } from "./mcp.ts";
@@ -314,14 +314,19 @@ export class McpTool extends ToolFunction<McpClient> {
   async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const onlyOneReq =
-        [typeof validated.list, typeof validated.call, typeof validated.tools]
-          .filter((m) => m !== "undefined").length === 1;
-      if (!onlyOneReq) {
+      const { excess, none } = assertOnlyOneDefined([validated.call, validated.list, validated.tools])
+      if (excess) {
         return {
           type: "error",
           error:
             "You can only request one of the three available actions, the other two must stay unset.",
+        };
+      }
+      if (none) {
+        return {
+          type: "error",
+          error:
+            "You did not request any action (list, tools, call) from this tool, and you need to request exactly one.",
         };
       }
       if (typeof validated.list !== "undefined") {
@@ -332,19 +337,13 @@ export class McpTool extends ToolFunction<McpClient> {
       } else if (validated.tools) {
         const tools = await this.ctx.listTools(validated.tools.serverNames);
         return { type: "success", result: tools };
-      } else if (validated.call) {
+      } else {
         const result = await this.ctx.callTool(
-          validated.call.serverName,
-          validated.call.toolName,
-          validated.call.toolInput,
+          validated.call!.serverName,
+          validated.call!.toolName,
+          validated.call!.toolInput,
         );
         return result;
-      } else {
-        return {
-          type: "error",
-          error:
-            "You did not request any action (list, tools, call) from this tool, and you need to request exactly one.",
-        };
       }
     } catch (e) {
       return {

@@ -43,4 +43,31 @@ export class LocalFileSystem implements FileSystem {
   async mkdir(path: string, recursive: boolean): Promise<void> {
     return await Deno.mkdir(path, { recursive });
   }
+
+  async readLines(path: string, nLines: number): Promise<string[]> {
+    const input = await Deno.open(path)
+    const reader = input.readable.getReader()
+    const lines: string[] = [];
+    let buffer = "";
+
+    const decoder = new TextDecoder()
+
+    try {
+      while (lines.length < nLines) {
+        const { value: encoded, done } = await reader.read()
+        if (done) break
+        const value = decoder.decode(encoded)
+        buffer += value
+        let idx: number;
+        while (lines.length < nLines && (idx = buffer.indexOf("\n")) !== -1) {
+          lines.push(buffer.slice(0, idx));
+          buffer = buffer.slice(idx + 1);
+        }
+      }
+    } finally {
+      await reader.cancel()
+    }
+
+    return lines
+  }
 }
