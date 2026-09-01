@@ -9,7 +9,7 @@ import {
 } from "@cle-does-things/lightagent-core";
 import * as v from "valibot";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 const HELP_MESSAGE = `
 \x1b[1;36mLightAgent CLI v${VERSION}\x1b[0m

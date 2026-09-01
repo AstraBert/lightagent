@@ -1,7 +1,7 @@
 import * as v from "valibot";
 import { Client } from "@modelcontextprotocol/sdk/client";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { ToolResult } from "./events.ts";
 
 const StdioMcpServerSchema = v.object({
@@ -27,7 +27,7 @@ export const McpServersDefinitionSchema = v.object({
 });
 
 const CLIENT_NAME = "lightagent-cli";
-const CLIENT_VERSION = "0.1.0";
+const CLIENT_VERSION = "0.1.1";
 
 function createTransport(server: McpServer) {
   switch (server.type) {
