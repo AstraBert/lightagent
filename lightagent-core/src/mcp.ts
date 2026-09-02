@@ -27,7 +27,7 @@ export const McpServersDefinitionSchema = v.object({
 });
 
 const CLIENT_NAME = "lightagent-cli";
-const CLIENT_VERSION = "0.1.1";
+const CLIENT_VERSION = "0.1.2";
 
 function createTransport(server: McpServer) {
   switch (server.type) {
@@ -116,11 +116,12 @@ export class McpClient {
           textResult += (item.text as string) + "\n";
           break;
         case "resource_link":
-          textResult += `Link to resource ${item.name}: ${item.uri}\nDescription: ${
-            (item.description as string) ?? "no description"
-          }\nMimetype: ${(item.mimeType as string) ?? "unknown"}\nSize:${
-            (item.size as number) ?? "unknown"
-          }\n`;
+          textResult +=
+            `Link to resource ${item.name}: ${item.uri}\nDescription: ${
+              (item.description as string) ?? "no description"
+            }\nMimetype: ${(item.mimeType as string) ?? "unknown"}\nSize:${
+              (item.size as number) ?? "unknown"
+            }\n`;
           break;
         case "resource": {
           const resource = item.resource as Record<string, unknown>;

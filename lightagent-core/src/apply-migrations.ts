@@ -1,7 +1,6 @@
 import type { SqliteClient } from "./storage.ts";
 import { migrations } from "./migrations/mod.ts";
 
-
 async function getCurrentMigration(db: SqliteClient): Promise<number> {
   const stmt = await db.prepare(
     "select name from sqlite_master where type='table' and name='_migrations'",

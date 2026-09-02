@@ -9,7 +9,7 @@ import {
 } from "@cle-does-things/lightagent-core";
 import * as v from "valibot";
 
-const VERSION = "0.1.1";
+const VERSION = "0.1.2";
 
 const HELP_MESSAGE = `
 \x1b[1;36mLightAgent CLI v${VERSION}\x1b[0m
@@ -165,6 +165,8 @@ if (import.meta.main) {
     autoSkillDiscovery: cmdOptions["discover-skills"],
   });
 
+  await agent.initWasm();
+
   await agent.checkForMigrations();
 
   const logger = new EventLogger(cmdOptions.json);
@@ -191,6 +193,11 @@ if (import.meta.main) {
     const promptText = prompt("\x1b[1;32m>\x1b[0m ");
     if (promptText === null || promptText.trim().toLowerCase() === "exit") {
       console.log("\x1b[2mGoodbye!\x1b[0m");
+      if (sessionId) {
+        console.log(
+          `\x1b[2mResume this session with: \`lightagent-cli --session-id ${sessionId}\`\x1b[0m`,
+        );
+      }
       break;
     }
     if (!promptText.trim()) continue;

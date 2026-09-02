@@ -1,7 +1,7 @@
 {
   "workspace": ["./lightagent-core", "./lightagent-local", "./lightagent-do"],
   "imports": {
-    "@cle-does-things/llms-sdk": "npm:@cle-does-things/llms-sdk@^0.2.3",
+    "@cle-does-things/llms-sdk-wasm": "npm:@cle-does-things/llms-sdk-wasm@^0.1.1",
     "@std/crypto": "jsr:@std/crypto@^1.1.0",
     "@std/path": "jsr:@std/path@^1.1.6",
     "@valibot/to-json-schema": "npm:@valibot/to-json-schema@^1.7.1",
@@ -10,5 +10,10 @@
   },
   "tasks": {
     "new-migration": "./scripts/generate-migration.py"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-slow-types"]
+    }
   }
 }

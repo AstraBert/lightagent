@@ -38,7 +38,13 @@ export function assertUniqueString(container: string, contained: string): void {
   );
 }
 
-export function assertOnlyOneDefined(elements: (unknown | undefined)[]): { exact: boolean, none: boolean, excess: boolean } {
-  const df = elements.filter((e) => typeof e !== "undefined")
-  return { exact: df.length === 1, excess: df.length > 1, none: df.length === 0 }
+export function assertOnlyOneDefined(
+  elements: (unknown | undefined)[],
+): { exact: boolean; none: boolean; excess: boolean } {
+  const df = elements.filter((e) => typeof e !== "undefined");
+  return {
+    exact: df.length === 1,
+    excess: df.length > 1,
+    none: df.length === 0,
+  };
 }
