@@ -25,7 +25,7 @@ jobs:
       - name: Lint
         run: deno lint
 
-      - name: Lint
+      - name: Format
         run: deno fmt
 
   local:
