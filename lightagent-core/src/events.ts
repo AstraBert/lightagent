@@ -1,11 +1,9 @@
 import * as v from "valibot";
-import {
-  type Message,
-  type MessagePart,
-  type MessageRole,
-  textMessage,
-} from "@cle-does-things/llms-sdk";
-import { error } from "node:console";
+import type {
+  Message,
+  MessagePart,
+  MessageRole,
+} from "@cle-does-things/llms-sdk-wasm";
 
 const SessionInitTypeSchema = v.picklist(["new", "resume"]);
 export type SessionInitType = v.InferOutput<typeof SessionInitTypeSchema>;
@@ -277,7 +275,12 @@ export function convertEventsToMessages(events: AgentEvent[]): Message[] {
   for (const event of events) {
     switch (event.type) {
       case "user.prompt_submit":
-        messages.push(textMessage(event.prompt));
+        messages.push(
+          {
+            role: "user" as MessageRole,
+            content: [{ type: "text", text: event.prompt }],
+          } as Message,
+        );
         break;
       case "assistant.response": {
         const parts: MessagePart[] = [];
@@ -334,7 +337,7 @@ export function convertEventsToMessages(events: AgentEvent[]): Message[] {
           role: "tool" as MessageRole,
           content: [{
             type: "toolResult",
-            toolCallId: event.toolCallId,
+            tool_call_id: event.toolCallId,
             result: event.result.type === "success"
               ? event.result.result
               : `Tool call failed\n${event.result.error}`,

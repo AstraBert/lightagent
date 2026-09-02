@@ -1,10 +1,14 @@
 import * as v from "valibot";
 import { toJsonSchema } from "@valibot/to-json-schema";
 
-import type { Tool } from "@cle-does-things/llms-sdk";
+import type { Tool } from "@cle-does-things/llms-sdk-wasm";
 import type { JsonValue, ToolResult } from "./events.ts";
 import type { SkillsClient } from "./skills.ts";
-import { assertFileWithinWorkspace, assertOnlyOneDefined, assertUniqueString } from "./assertions.ts";
+import {
+  assertFileWithinWorkspace,
+  assertOnlyOneDefined,
+  assertUniqueString,
+} from "./assertions.ts";
 import type { FileSystem } from "./fs.ts";
 import type { Shell } from "./shell.ts";
 import type { McpClient } from "./mcp.ts";
@@ -314,7 +318,11 @@ export class McpTool extends ToolFunction<McpClient> {
   async execute(input: JsonValue): Promise<ToolResult> {
     try {
       const validated = v.parse(this.inputSchema, input);
-      const { excess, none } = assertOnlyOneDefined([validated.call, validated.list, validated.tools])
+      const { excess, none } = assertOnlyOneDefined([
+        validated.call,
+        validated.list,
+        validated.tools,
+      ]);
       if (excess) {
         return {
           type: "error",

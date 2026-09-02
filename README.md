@@ -2,25 +2,28 @@
 
 Lightweight CLI agent, built on [Deno](https://deno.com).
 
-> ⚠️ **Work in Progress** — Everything here is still pretty much WIP. APIs may change, features may break, and dragons may be present. Use at your own risk!
+> ⚠️ **Work in Progress** — Everything here is still pretty much WIP. APIs may
+> change, features may break, and dragons may be present. Use at your own risk!
 
 ## Project Status
 
-| Package | Status | Description |
-|---------|--------|-------------|
-| `lightagent-core` | 🚧 WIP | Common interfaces and types shared across all packages |
-| `lightagent-local` | 🧪 Alpha | Ready for testing, but expect rough edges |
-| `lightagent-do` | 🚧 WIP | Actively being developed, not ready for use |
+| Package            | Status   | Description                                            |
+| ------------------ | -------- | ------------------------------------------------------ |
+| `lightagent-core`  | 🚧 WIP   | Common interfaces and types shared across all packages |
+| `lightagent-local` | 🧪 Alpha | Ready for testing, but expect rough edges              |
+| `lightagent-do`    | 🚧 WIP   | Actively being developed, not ready for use            |
 
 ## Packages
 
 ### `lightagent-core`
 
-Defines all the common interfaces and types used across the lightagent ecosystem. This is the foundation that other packages build upon.
+Defines all the common interfaces and types used across the lightagent
+ecosystem. This is the foundation that other packages build upon.
 
 ### `lightagent-local`
 
-A local CLI agent that runs on your machine. Currently in **alpha** — it works, but needs more testing and polish.
+A local CLI agent that runs on your machine. Currently in **alpha** — it works,
+but needs more testing and polish.
 
 #### Quick Start
 
@@ -37,7 +40,8 @@ deno task build
 ./lightagent-cli --help
 ```
 
-You can also download the binary from the [releases page](https://github.com/AstraBert/lightagent/releases)
+You can also download the binary from the
+[releases page](https://github.com/AstraBert/lightagent/releases)
 
 ### `lightagent-do`
 

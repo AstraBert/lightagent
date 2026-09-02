@@ -17,6 +17,7 @@ export class AsyncQueue<T> {
     }
   }
 
+  // deno-lint-ignore require-await
   async next(): Promise<QueueItem<T>> {
     if (this.items.length > 0) {
       return this.items.shift()!;

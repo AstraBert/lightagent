@@ -25,14 +25,14 @@ import { LocalShell } from "./shell.ts";
 import { LocalEnvironment } from "./environment.ts";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import {
-  ApiType,
-  Llm,
-  LlmRequest,
-  Message,
-  MessageRole,
-  textMessage,
-  ToolCallPart,
-} from "@cle-does-things/llms-sdk";
+  type ApiType,
+  type LLMRequest,
+  type LLMStreamingResponse,
+  type Message,
+  type MessageRole,
+  type ToolCallPart,
+} from "@cle-does-things/llms-sdk-wasm";
+import init, * as sdk from "@cle-does-things/llms-sdk-wasm";
 import { crypto } from "@std/crypto/crypto";
 import pLimit from "p-limit";
 
@@ -125,7 +125,6 @@ export class LocalLightAgent {
   skillsList: string[];
   promptCaching: boolean;
   parallelToolCalls: boolean;
-  private llmClient: Llm = new Llm();
   private history: Message[] = [];
   private env: LocalEnvironment = new LocalEnvironment();
   private skills: Map<string, string> = new Map();
@@ -144,6 +143,7 @@ export class LocalLightAgent {
   };
   private resolvedSkills: boolean = false;
   private resolvedSystem: boolean = false;
+  private wasmInited: boolean = false;
 
   constructor(options: {
     model: string;
@@ -165,12 +165,12 @@ export class LocalLightAgent {
     );
     this.provider = provider;
     this.apiKey = apiKey;
-    this.baseUrl = options.baseUrl ?? (provider == "openai"
-      ? DEFAULT_OPENAI_BASE_URL
-      : DEFAULT_ANTHROPIC_BASE_URL);
-    this.autoSkillDiscovery = options.autoSkillDiscovery ?? (options.skillsList
-      ? false
-      : true);
+    this.baseUrl = options.baseUrl ??
+      (provider == "openai"
+        ? DEFAULT_OPENAI_BASE_URL
+        : DEFAULT_ANTHROPIC_BASE_URL);
+    this.autoSkillDiscovery = options.autoSkillDiscovery ??
+      (options.skillsList ? false : true);
     this.skillsList = options.skillsList ?? [];
     this.system = options.system
       ? options.system.append
@@ -192,6 +192,12 @@ export class LocalLightAgent {
     if (options.mcpServers) {
       const mcpClient = new McpClient(options.mcpServers);
       this.tools.mcp = new McpTool(mcpClient);
+    }
+  }
+
+  async initWasm() {
+    if (!this.wasmInited) {
+      await init();
     }
   }
 
@@ -354,11 +360,11 @@ export class LocalLightAgent {
       yield initEvent;
     }
     this.history = [
-      textMessage(this.system, "system" as MessageRole),
+      sdk.textMessage(this.system, "system" as MessageRole),
       ...this.history,
     ];
     const resolvedPrompt = await this.resolvePrompt(prompt);
-    this.history.push(textMessage(resolvedPrompt));
+    this.history.push(sdk.textMessage(resolvedPrompt));
     const sessionStart = new Date();
     let inputTokens = 0;
     let outputTokens = 0;
@@ -386,95 +392,98 @@ export class LocalLightAgent {
       const request = {
         model: this.model,
         baseUrl: this.baseUrl,
-        apiType: this.provider as ApiType,
-        apiKey: this.apiKey,
+        api_type: this.provider as ApiType,
+        api_key: this.apiKey,
         stream: true,
         messages: this.history,
         tools: Object.values(this.tools).filter((t) => typeof t !== "undefined")
           .map((t) => t.toSdkTool()),
-        parallelToolCalls: this.parallelToolCalls,
-        promptCacheTtl: this.promptCaching
+        parallel_tool_calls: this.parallelToolCalls,
+        prompt_cache_ttl: this.promptCaching
           ? this.provider === "anthropic" ? "5m" : "30m"
           : undefined,
-      } as LlmRequest;
+      } as LLMRequest;
       const queue = new AsyncQueue<AgentEvent>();
       let toolCalls: ToolCallPart[] = [];
       let assistantMessage: Message | null = null;
-      this.llmClient.streamResponse(request, (err, chunk) => {
-        if (err) {
-          queue.push({
-            chunk: {
-              type: "session.stop" as const,
-              success: false,
-              timestamp: new Date(),
-              error:
-                `An error occurred while generating the agent response: ${err}`,
-              usage: {
-                cacheReadTokens,
-                cacheWriteTokens,
-                inputTokens,
-                outputTokens,
-                latency: Date.now() - Number(sessionStart),
-              },
-              sessionId: resolvedSid,
-            },
-            isError: true,
-          });
-          return;
-        }
-        if (!chunk) {
-          queue.push({ done: true });
-          return;
-        }
-        switch (chunk.type) {
-          case "textDelta":
+      sdk.streamChat(
+        request,
+        (err: string | null, chunk?: LLMStreamingResponse) => {
+          if (err) {
             queue.push({
               chunk: {
-                type: "stream.delta",
-                delta: chunk.textDelta ?? "",
-                deltaType: "text",
-                turnId,
-                sessionId: resolvedSid,
+                type: "session.stop" as const,
+                success: false,
                 timestamp: new Date(),
-              },
-            });
-            break;
-          case "thinkingDelta":
-            queue.push({
-              chunk: {
-                type: "stream.delta",
-                delta: chunk.thinkingDelta ?? "",
-                deltaType: "thinking",
-                turnId,
+                error:
+                  `An error occurred while generating the agent response: ${err}`,
+                usage: {
+                  cacheReadTokens,
+                  cacheWriteTokens,
+                  inputTokens,
+                  outputTokens,
+                  latency: Date.now() - Number(sessionStart),
+                },
                 sessionId: resolvedSid,
-                timestamp: new Date(),
               },
+              isError: true,
             });
-            break;
-          case "complete": {
-            assistantMessage = chunk.message;
-            toolCalls = chunk.toolCalls ?? [];
-            if (chunk.usage) {
-              inputTokens += chunk.usage.inputTokens;
-              outputTokens += chunk.usage.outputTokens;
-              cacheReadTokens += chunk.usage.cacheReadTokens ?? 0;
-              cacheWriteTokens += chunk.usage.cacheWriteTokens ?? 0;
-            }
-            queue.push({
-              chunk: {
-                type: "assistant.response",
-                content: messageToAssistantContent(chunk.message.content),
-                sessionId: resolvedSid,
-                turnId,
-                timestamp: new Date(),
-              },
-              done: true,
-            });
-            break;
+            return;
           }
-          default:
-        }
-      });
+          if (!chunk) {
+            queue.push({ done: true });
+            return;
+          }
+          switch (chunk.type) {
+            case "delta":
+              queue.push({
+                chunk: {
+                  type: "stream.delta",
+                  delta: chunk.delta ?? "",
+                  deltaType: "text",
+                  turnId,
+                  sessionId: resolvedSid,
+                  timestamp: new Date(),
+                },
+              });
+              break;
+            case "thinkingDelta":
+              queue.push({
+                chunk: {
+                  type: "stream.delta",
+                  delta: chunk.delta ?? "",
+                  deltaType: "thinking",
+                  turnId,
+                  sessionId: resolvedSid,
+                  timestamp: new Date(),
+                },
+              });
+              break;
+            case "complete": {
+              assistantMessage = chunk.message;
+              toolCalls = chunk.tool_calls ?? [];
+              if (chunk.usage) {
+                inputTokens += chunk.usage.input_tokens;
+                outputTokens += chunk.usage.output_tokens;
+                cacheReadTokens += chunk.usage.cache_read_tokens ?? 0;
+                cacheWriteTokens += chunk.usage.cache_write_tokens ?? 0;
+              }
+              queue.push({
+                chunk: {
+                  type: "assistant.response",
+                  content: messageToAssistantContent(chunk.message.content),
+                  sessionId: resolvedSid,
+                  turnId,
+                  timestamp: new Date(),
+                },
+                done: true,
+              });
+              break;
+            }
+            default:
+          }
+        },
+      );
 
       let hasError = false;
 
@@ -737,7 +746,7 @@ export class LocalLightAgent {
             result: result.result.type === "success"
               ? result.result.result
               : `ERROR!\n${result.result.error}`,
-            toolCallId: result.callId,
+            tool_call_id: result.callId,
           }],
         });
       }
