@@ -31,6 +31,7 @@ jobs:
   local:
     name: Local Agent CI
     runs-on: ubuntu-latest
+    needs: [workspace]
 
     steps:
       - name: Clone repository
