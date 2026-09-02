@@ -78,15 +78,12 @@ export class EventLogger {
         await writeOut("\n");
         break;
       }
-      case "memory.storage": {
-        if (event.error) {
-          await writeOut("\n");
-          await writeLine(
-            `${
-              addColor("\WARNING!", 220)
-            } Could not store the summary of the current session, memories will be out of sync`,
-          );
-        }
+      case "session.interrupt": {
+        await writeOut("\n");
+        await writeOut("\n");
+        await writeLine(
+          addColor(`Session ${event.sessionId} was interrupted`, 183),
+        );
         break;
       }
       case "session.stop":

@@ -7,6 +7,7 @@ export class LocalShell implements Shell {
     timeout: number,
     options?: {
       args?: string[];
+      cwd?: string;
       stdout?: StdFileMode;
       stderr?: StdFileMode;
       stdin?: StdFileMode;

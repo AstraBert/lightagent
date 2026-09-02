@@ -1,12 +1,11 @@
 import { LocalLightAgent } from "./agent.ts";
 import { EventLogger } from "./logger.ts";
 import { parseArgs } from "@std/cli";
+import { isProvider, Provider } from "@cle-does-things/lightagent-core";
 import {
-  isProvider,
   McpServer,
   McpServersDefinitionSchema,
-  Provider,
-} from "@cle-does-things/lightagent-core";
+} from "@cle-does-things/lightagent-core/mcp";
 import * as v from "valibot";
 
 const VERSION = "0.1.2";
@@ -62,6 +61,61 @@ A lightweight CLI agent built on Deno.
 
 \x1b[2mNote: This is alpha software. Expect changes and bugs!\x1b[0m
 `;
+
+async function runTurn(
+  promptText: string,
+  sessionId: string | undefined,
+  agent: LocalLightAgent,
+  logger: EventLogger,
+): Promise<string | undefined> {
+  const controller = new AbortController();
+  const signal = controller.signal;
+
+  Deno.stdin.setRaw(true);
+  const reader = Deno.stdin.readable.getReader();
+
+  const watcher = (async () => {
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done || !value) return;
+        for (const byte of value) {
+          // Ctrl+D = 0x04, Esc = 0x1b
+          if (byte === 0x04 || byte === 0x1b) {
+            controller.abort();
+            return;
+          }
+        }
+      }
+    } catch {
+      // expected once we cancel() below
+    }
+  })();
+
+  try {
+    for await (
+      const event of agent.run(promptText, { sessionId, abortSignal: signal })
+    ) {
+      await logger.log(event);
+      if (event.type === "session.init") {
+        sessionId = event.sessionId;
+      }
+    }
+  } catch (err) {
+    if (signal.aborted) {
+      console.log();
+    } else {
+      throw err;
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+    await watcher;
+    Deno.stdin.setRaw(false);
+  }
+
+  return sessionId;
+}
 
 if (import.meta.main) {
   const cmdOptions = parseArgs(Deno.args, {
@@ -173,11 +227,7 @@ if (import.meta.main) {
 
   // Headless mode: --prompt provided
   if (cmdOptions.prompt) {
-    for await (
-      const event of agent.run(cmdOptions.prompt, cmdOptions["session-id"])
-    ) {
-      await logger.log(event);
-    }
+    await runTurn(cmdOptions.prompt, cmdOptions["session-id"], agent, logger);
     Deno.exit(0);
   }
 
@@ -202,13 +252,7 @@ if (import.meta.main) {
     }
     if (!promptText.trim()) continue;
 
-    for await (const event of agent.run(promptText, sessionId)) {
-      await logger.log(event);
-      if (event.type === "session.init") {
-        sessionId = event.sessionId;
-      }
-    }
-
-    console.log(); // blank line between turns
+    sessionId = await runTurn(promptText, sessionId, agent, logger);
+    console.log();
   }
 }
