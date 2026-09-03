@@ -249,6 +249,24 @@ export class LocalLightAgent {
     await this.storage.initStorage();
   }
 
+  /* Fetch the stored events of a past session, filtered down to what is
+  meaningful to display when replaying the session on the terminal. */
+  async getSessionReplay(sessionId: string): Promise<AgentEvent[]> {
+    const result = await this.safeGetSessionEvents(sessionId);
+    if (result.type === "failure") {
+      throw new Error(
+        result.event.type === "session.stop"
+          ? result.event.error
+          : "Unknown error while fetching session events",
+      );
+    }
+    return result.events.filter((event) =>
+      event.type !== "session.init" &&
+      event.type !== "session.stop" &&
+      event.type !== "tool.call_any"
+    );
+  }
+
   private async resolvePrompt(prompt: string) {
     if (prompt.startsWith("/")) {
       const skillName = prompt.split(" ")[0]!.slice(1);
