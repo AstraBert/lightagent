@@ -124,7 +124,9 @@ async function runTurn(
   })();
 
   try {
-    for await (const event of agent.run(promptText, { sessionId, abortSignal: signal })) {
+    for await (
+      const event of agent.run(promptText, { sessionId, abortSignal: signal })
+    ) {
       await logger.log(event);
       if (event.type === "session.init") {
         sessionId = event.sessionId;
