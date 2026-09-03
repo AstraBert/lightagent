@@ -8,7 +8,7 @@ import {
 } from "@cle-does-things/lightagent-core/mcp";
 import * as v from "valibot";
 
-const VERSION = "0.1.2";
+const VERSION = "0.1.3";
 
 const HELP_MESSAGE = `
 \x1b[1;36mLightAgent CLI v${VERSION}\x1b[0m
