@@ -5,8 +5,6 @@ import {
   convertEventsToMessages,
   EditTool,
   JsonValue,
-  McpClient,
-  McpServer,
   McpTool,
   messageToAssistantContent,
   Provider,
@@ -19,6 +17,7 @@ import {
   Usage,
   WriteTool,
 } from "@cle-does-things/lightagent-core";
+import { McpClient, McpServer } from "@cle-does-things/lightagent-core/mcp";
 import { LocalFileSystem } from "./fs.ts";
 import { getDbPath, LocalSqliteClient } from "./storage.ts";
 import { LocalShell } from "./shell.ts";
@@ -250,6 +249,24 @@ export class LocalLightAgent {
     await this.storage.initStorage();
   }
 
+  /* Fetch the stored events of a past session, filtered down to what is
+  meaningful to display when replaying the session on the terminal. */
+  async getSessionReplay(sessionId: string): Promise<AgentEvent[]> {
+    const result = await this.safeGetSessionEvents(sessionId);
+    if (result.type === "failure") {
+      throw new Error(
+        result.event.type === "session.stop"
+          ? result.event.error
+          : "Unknown error while fetching session events",
+      );
+    }
+    return result.events.filter((event) =>
+      event.type !== "session.init" &&
+      event.type !== "session.stop" &&
+      event.type !== "tool.call_any"
+    );
+  }
+
   private async resolvePrompt(prompt: string) {
     if (prompt.startsWith("/")) {
       const skillName = prompt.split(" ")[0]!.slice(1);
@@ -314,13 +331,16 @@ export class LocalLightAgent {
     }
   }
 
-  async *run(prompt: string, sessionId?: string): AsyncGenerator<AgentEvent> {
+  async *run(
+    prompt: string,
+    options: { sessionId?: string; abortSignal: AbortSignal },
+  ): AsyncGenerator<AgentEvent> {
     await this.resolveSystem();
     let resolvedSid: string;
     let errEvent: AgentEvent | undefined;
-    if (sessionId) {
-      resolvedSid = sessionId;
-      const result = await this.safeGetSessionEvents(sessionId);
+    if (options.sessionId) {
+      resolvedSid = options.sessionId;
+      const result = await this.safeGetSessionEvents(options.sessionId);
       if (result.type == "failure") {
         yield result.event;
         return;
@@ -330,7 +350,7 @@ export class LocalLightAgent {
         type: "session.init" as const,
         initType: "resume" as SessionInitType,
         system: this.system,
-        sessionId,
+        sessionId: options.sessionId,
         provider: this.provider,
         model: this.model,
         timestamp: new Date(),
@@ -391,7 +411,7 @@ export class LocalLightAgent {
     while (true) {
       const request = {
         model: this.model,
-        baseUrl: this.baseUrl,
+        base_url: this.baseUrl,
         api_type: this.provider as ApiType,
         api_key: this.apiKey,
         stream: true,
@@ -409,6 +429,10 @@ export class LocalLightAgent {
       sdk.streamChat(
         request,
         (err: string | null, chunk?: LLMStreamingResponse) => {
+          if (options.abortSignal.aborted) {
+            queue.push({ done: true, isInterrupt: true });
+            return;
+          }
           if (err) {
             queue.push({
               chunk: {
@@ -486,6 +510,7 @@ export class LocalLightAgent {
       );
 
       let hasError = false;
+      let hasInterrupt = false;
 
       while (true) {
         const item = await queue.next();
@@ -505,6 +530,9 @@ export class LocalLightAgent {
           yield item.chunk;
           break;
         } else if (item.done && !item.chunk) {
+          if (item.isInterrupt) {
+            hasInterrupt = true;
+          }
           break;
         } else {
           errEvent = await this.safeStore(item.chunk!, resolvedSid, {
@@ -524,6 +552,15 @@ export class LocalLightAgent {
             break;
           }
         }
+      }
+
+      if (hasInterrupt) {
+        yield {
+          type: "session.interrupt",
+          timestamp: new Date(),
+          sessionId: resolvedSid,
+        };
+        break;
       }
 
       if (!assistantMessage) {

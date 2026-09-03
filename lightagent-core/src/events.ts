@@ -180,14 +180,11 @@ const AssistantResponseEventSchema = v.object({
   timestamp: v.date(),
 });
 
-const MemoryStorageEventSchema = v.object({
-  type: v.literal("memory.storage"),
+const InterruptionEventSchema = v.object({
+  type: v.literal("session.interrupt"),
   sessionId: v.string(),
   timestamp: v.date(),
-  success: v.boolean(),
-  error: v.optional(v.string()),
 });
-export type MemoryStorageEvent = v.InferOutput<typeof MemoryStorageEventSchema>;
 
 export const AgentEventSchema = v.union([
   SessionInitEventSchema,
@@ -199,7 +196,7 @@ export const AgentEventSchema = v.union([
   AssistantResponseEventSchema,
   ToolResultEventSchema,
   StreamDeltaEventSchema,
-  MemoryStorageEventSchema,
+  InterruptionEventSchema,
 ]);
 export type AgentEvent = v.InferOutput<typeof AgentEventSchema>;
 

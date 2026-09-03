@@ -223,6 +223,12 @@ export class ShellTool extends ToolFunction<Shell> {
       v.array(v.string()),
       v.description("Arguments for the executable"),
     ),
+    cwd: v.pipe(
+      v.optional(v.string()),
+      v.description(
+        "Working directory where to execute the command. Defaults to the working directory currently in use.",
+      ),
+    ),
     timeout: v.pipe(
       v.optional(v.number()),
       v.description(

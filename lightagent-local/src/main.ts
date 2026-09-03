@@ -1,12 +1,11 @@
 import { LocalLightAgent } from "./agent.ts";
 import { EventLogger } from "./logger.ts";
 import { parseArgs } from "@std/cli";
+import { isProvider, Provider } from "@cle-does-things/lightagent-core";
 import {
-  isProvider,
   McpServer,
   McpServersDefinitionSchema,
-  Provider,
-} from "@cle-does-things/lightagent-core";
+} from "@cle-does-things/lightagent-core/mcp";
 import * as v from "valibot";
 
 const VERSION = "0.1.2";
@@ -62,6 +61,90 @@ A lightweight CLI agent built on Deno.
 
 \x1b[2mNote: This is alpha software. Expect changes and bugs!\x1b[0m
 `;
+
+const encoder = new TextEncoder();
+const stdinReader = Deno.stdin.readable.getReader();
+Deno.stdin.setRaw(true);
+
+async function readByte(): Promise<number> {
+  const { value, done } = await stdinReader.read();
+  if (done || !value || value.length === 0) return -1;
+  return value[0]; // one byte at a time keeps this simple
+}
+
+async function readLine(promptStr: string): Promise<string | null> {
+  await Deno.stdout.write(encoder.encode(promptStr));
+  const chars: string[] = [];
+  while (true) {
+    const byte = await readByte();
+    if (byte === -1) return null;
+    if (byte === 0x04 && chars.length === 0) return null; // Ctrl+D on empty line = exit
+    if (byte === 0x0d || byte === 0x0a) { // Enter
+      await Deno.stdout.write(encoder.encode("\r\n"));
+      return chars.join("");
+    }
+    if (byte === 0x7f || byte === 0x08) { // Backspace
+      if (chars.length) {
+        chars.pop();
+        await Deno.stdout.write(encoder.encode("\b \b"));
+      }
+      continue;
+    }
+    if (byte === 0x03) { // Ctrl+C
+      Deno.stdin.setRaw(false);
+      Deno.exit(0);
+    }
+    if (byte >= 0x20) {
+      const ch = String.fromCharCode(byte);
+      chars.push(ch);
+      await Deno.stdout.write(encoder.encode(ch));
+    }
+  }
+}
+
+async function runTurn(
+  promptText: string,
+  sessionId: string | undefined,
+  agent: LocalLightAgent,
+  logger: EventLogger,
+): Promise<string | undefined> {
+  const controller = new AbortController();
+  const signal = controller.signal;
+
+  let done = false;
+  const _watcher = (async () => {
+    while (!done) {
+      const byte = await readByte();
+      if (byte === 0x1b) {
+        controller.abort();
+        return;
+      }
+      if (byte === -1) return;
+    }
+  })();
+
+  try {
+    for await (
+      const event of agent.run(promptText, { sessionId, abortSignal: signal })
+    ) {
+      await logger.log(event);
+      if (event.type === "session.init") {
+        sessionId = event.sessionId;
+      }
+    }
+  } catch (err) {
+    if (signal.aborted) {
+      console.log();
+    } else {
+      throw err;
+    }
+  } finally {
+    done = true;
+    controller.abort(); // no-op if already aborted, just guarantees the watcher's loop condition is false next check
+  }
+
+  return sessionId;
+}
 
 if (import.meta.main) {
   const cmdOptions = parseArgs(Deno.args, {
@@ -171,26 +254,42 @@ if (import.meta.main) {
 
   const logger = new EventLogger(cmdOptions.json);
 
-  // Headless mode: --prompt provided
-  if (cmdOptions.prompt) {
-    for await (
-      const event of agent.run(cmdOptions.prompt, cmdOptions["session-id"])
-    ) {
-      await logger.log(event);
-    }
-    Deno.exit(0);
+  // Interactive CLI mode
+  if (!cmdOptions.prompt) {
+    console.log(`\x1b[1;36mLightAgent v${VERSION}\x1b[0m`);
+    console.log(
+      "\x1b[2mType your prompt and press Enter. Use Ctrl+C/Ctrl+D or type 'exit' to quit. Use Esc to stop a running session.\x1b[0m\n",
+    );
   }
 
-  // Interactive CLI mode
-  console.log(`\x1b[1;36mLightAgent v${VERSION}\x1b[0m`);
-  console.log(
-    "\x1b[2mType your prompt and press Enter. Use Ctrl+C or type 'exit' to quit.\x1b[0m\n",
-  );
+  // When resuming a session, replay its past events so the user can see
+  // the conversation so far before continuing it.
+  if (cmdOptions["session-id"]) {
+    try {
+      const replayEvents = await agent.getSessionReplay(
+        cmdOptions["session-id"],
+      );
+      await logger.logReplay(replayEvents);
+    } catch (e) {
+      console.error(
+        `\x1b[1;31mERROR! Could not replay session ${
+          cmdOptions["session-id"]
+        }: ${e}\x1b[1;39m`,
+      );
+      Deno.exit(1);
+    }
+  }
+
+  // Headless mode: --prompt provided
+  if (cmdOptions.prompt) {
+    await runTurn(cmdOptions.prompt, cmdOptions["session-id"], agent, logger);
+    Deno.exit(0);
+  }
 
   let sessionId: string | undefined = cmdOptions["session-id"];
 
   while (true) {
-    const promptText = prompt("\x1b[1;32m>\x1b[0m ");
+    const promptText = await readLine("\x1b[1;32m>\x1b[0m ");
     if (promptText === null || promptText.trim().toLowerCase() === "exit") {
       console.log("\x1b[2mGoodbye!\x1b[0m");
       if (sessionId) {
@@ -202,13 +301,9 @@ if (import.meta.main) {
     }
     if (!promptText.trim()) continue;
 
-    for await (const event of agent.run(promptText, sessionId)) {
-      await logger.log(event);
-      if (event.type === "session.init") {
-        sessionId = event.sessionId;
-      }
-    }
-
-    console.log(); // blank line between turns
+    sessionId = await runTurn(promptText, sessionId, agent, logger);
+    console.log();
   }
+
+  Deno.stdin.setRaw(false);
 }

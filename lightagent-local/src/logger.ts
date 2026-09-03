@@ -28,6 +28,35 @@ export class EventLogger {
 
   constructor(private readonly json: boolean) {}
 
+  /* Replay the stored events of a resumed session, framing them so that the
+  transition to the live conversation is clear. */
+  async logReplay(events: AgentEvent[]): Promise<void> {
+    if (this.json) {
+      for (const event of events) {
+        await this.log(event);
+      }
+      return;
+    }
+    if (events.length === 0) {
+      return;
+    }
+    for (const event of events) {
+      if (event.type === "user.prompt_submit") {
+        await writeOut("\n");
+        await writeLine(
+          `${addColor(">", 34)} ${event.prompt}`,
+        );
+        await writeOut("\n");
+        continue;
+      }
+      await this.log(event);
+    }
+    this.wasThinking = false;
+    this.wasTexting = false;
+    await writeOut("\n");
+    await writeOut("\n");
+  }
+
   async log(event: AgentEvent): Promise<void> {
     if (this.json) {
       await writeLine(JSON.stringify(event));
@@ -78,15 +107,12 @@ export class EventLogger {
         await writeOut("\n");
         break;
       }
-      case "memory.storage": {
-        if (event.error) {
-          await writeOut("\n");
-          await writeLine(
-            `${
-              addColor("\WARNING!", 220)
-            } Could not store the summary of the current session, memories will be out of sync`,
-          );
-        }
+      case "session.interrupt": {
+        await writeOut("\n");
+        await writeOut("\n");
+        await writeLine(
+          addColor(`Session ${event.sessionId} was interrupted`, 183),
+        );
         break;
       }
       case "session.stop":
