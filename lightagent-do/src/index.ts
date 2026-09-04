@@ -21,10 +21,10 @@ const SkillsRequestSchema = v.object({
 export default {
   async fetch(request: Request, env: DOEnv) {
     const uploader = new FileUploader(env.FS);
-    if (request.method.toUpperCase() === "POST") {
+    if (request.method === "POST") {
       const pathParam = new URL(request.url).pathname;
       switch (pathParam) {
-        case "repos": {
+        case "/repos": {
           const token = request.headers.get("x-github-token");
           if (!token) {
             return Response.json({
@@ -43,10 +43,11 @@ export default {
             return Response.json({
               detail:
                 `An error occurred while trying to download the GitHub repository: ${e}`,
+              stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack"
             }, { status: 500 });
           }
         }
-        case "files": {
+        case "/files": {
           const form = await request.formData();
           const fl = form.get("file");
           const path = form.get("path");
@@ -79,6 +80,7 @@ export default {
             return Response.json({
               detail:
                 `An error occurred while trying to read the file to text: ${e}. Provided files should always be text-based`,
+                stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack"
             }, { status: 400 });
           }
           try {
@@ -87,10 +89,11 @@ export default {
           } catch (e) {
             return Response.json({
               detail: `An error occurred while trying to upload the file: ${e}`,
+              stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack"
             }, { status: 500 });
           }
         }
-        case "skills": {
+        case "/skills": {
           try {
             const data = await request.json();
             const validated = v.parse(SkillsRequestSchema, data);
@@ -105,6 +108,7 @@ export default {
             return Response.json({
               detail:
                 `An error occurred while trying to upload the skill: ${e}`,
+                stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack"
             }, { status: 500 });
           }
         }

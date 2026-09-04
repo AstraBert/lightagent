@@ -30,7 +30,7 @@ class StatsImpl implements Stats {
       (base.isFile ? 0o100644 : base.isDirectory ? 0o40755 : 0o120000);
     this.mtimeMs = base.mtime?.toTemporalInstant().epochMilliseconds ?? 0;
     this.ino = base.ino ?? undefined;
-    this.ctimeMs = base.ctime?.toTemporalInstant().epochMilliseconds;
+    this.ctimeMs = base.ctime?.toTemporalInstant().epochMilliseconds ?? 0;
   }
 
   isFile(): boolean {
@@ -48,13 +48,30 @@ class StatsImpl implements Stats {
 
 class GitFs implements git.PromiseFsClient {
   private base: R2Bucket;
+  repoRoot: string;
 
-  constructor(base: R2Bucket) {
+  constructor(base: R2Bucket, repoRoot: string) {
     this.base = base;
+    this.repoRoot = repoRoot
   }
 
   private pathToKey(path: string): string {
     return path.replace(/^\/+/, "");
+  }
+
+  private normalizePath(path: string): string {
+    const parts = path.split("/").filter((p) => p !== "" && p !== ".");
+    const stack: string[] = [];
+    for (const part of parts) {
+      if (part === "..") stack.pop();
+      else stack.push(part);
+    }
+    return "/" + stack.join("/");
+  }
+
+  private isImpliedDirectory(path: string): boolean {
+    const normalized = this.normalizePath(path);
+    return normalized === "/" || normalized === "" || normalized === this.repoRoot;
   }
 
   readonly promises = {
@@ -78,7 +95,7 @@ class GitFs implements git.PromiseFsClient {
         const decoder = new TextDecoder();
         return decoder.decode(content);
       }
-      return Uint8Array.from([content]);
+      return new Uint8Array(content);
     },
     writeFile: async (
       path: string,
@@ -145,14 +162,51 @@ class GitFs implements git.PromiseFsClient {
       } while (cursor);
     },
     stat: async (path: string): Promise<Stats> => {
+      if (this.isImpliedDirectory(path)) {
+        // repo root always "exists" as a directory, even with zero objects under it yet
+        return new StatsImpl({
+          isFile: false,
+          isDirectory: true,
+          isSymlink: false,
+          size: 0,
+          mtime: null, atime: null, birthtime: null, ctime: null,
+          dev: 0, ino: null, mode: null, nlink: null,
+          uid: null, gid: null, rdev: null, blksize: null, blocks: null,
+          isBlockDevice: false, isCharDevice: false, isFifo: false, isSocket: false,
+        });
+      }
       const fs = new DOFileSystem(this.base);
       const info = await fs.stat(path);
       return new StatsImpl(info);
     },
     lstat: async (path: string): Promise<Stats> => {
+      if (this.isImpliedDirectory(path)) {
+        // repo root always "exists" as a directory, even with zero objects under it yet
+        return new StatsImpl({
+          isFile: false,
+          isDirectory: true,
+          isSymlink: false,
+          size: 0,
+          mtime: null, atime: null, birthtime: null, ctime: null,
+          dev: 0, ino: null, mode: null, nlink: null,
+          uid: null, gid: null, rdev: null, blksize: null, blocks: null,
+          isBlockDevice: false, isCharDevice: false, isFifo: false, isSocket: false,
+        });
+      }
       const fs = new DOFileSystem(this.base);
       const info = await fs.stat(path);
       return new StatsImpl(info);
+    },
+    // deno-lint-ignore require-await
+    readlink: async (_path: string): Promise<string> => {
+      throw new Error("readlink not supported on R2-backed filesystem");
+      },
+    // deno-lint-ignore require-await
+    symlink: async (_target: string, _path: string): Promise<void> => {
+      throw new Error("symlink not supported on R2-backed filesystem");
+    },
+    chmod: async (_path: string, _mode: number): Promise<void> => {
+      // no-op: R2 has no real file permissions
     },
   };
 }
@@ -203,9 +257,9 @@ export class FileUploader {
     authToken: string,
     options?: { branch?: string },
   ) {
-    const fs = new GitFs(this.bucket);
     const splat = repositoryUrl.split("/");
     const dir = "/" + splat[splat.length - 1].replaceAll(".git", "");
+    const fs = new GitFs(this.bucket, dir);
     await git.clone({
       fs,
       http,
