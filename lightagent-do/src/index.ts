@@ -1,14 +1,32 @@
 import * as v from "valibot";
 import { FileUploader } from "./uploader.ts";
+import { Provider } from "@cle-does-things/lightagent-core";
+import { DOLightAgent } from "./agent.ts";
 
 interface DOEnv {
   FS: R2Bucket;
   DB: D1Database;
 }
 
+const AgentRequestSchema = v.object({
+  model: v.string(),
+  base_url: v.optional(v.string()),
+  skills: v.optional(v.array(v.string())),
+  auto_skill_discovery: v.optional(v.boolean()),
+  prompt_caching: v.optional(v.boolean()),
+  parallel_tool_calls: v.optional(v.boolean()),
+  system: v.optional(v.object({
+    content: v.string(),
+    append: v.boolean(),
+  })),
+  prompt: v.string(),
+  session_id: v.optional(v.string()),
+});
+
 const ReposRequestSchema = v.object({
-  url: v.string(),
-  branch: v.optional(v.string()),
+  owner: v.string(),
+  name: v.string(),
+  ref: v.optional(v.string()),
 });
 
 const SkillsRequestSchema = v.object({
@@ -24,6 +42,79 @@ export default {
     if (request.method === "POST") {
       const pathParam = new URL(request.url).pathname;
       switch (pathParam) {
+        case "/agents": {
+          const openaiKey = request.headers.get("x-openai-key");
+          const anthropicKey = request.headers.get("x-anthropic-key");
+          if (!openaiKey && !anthropicKey) {
+            return Response.json({
+              detail:
+                "You need to provide an OpenAI API key under the `x-openai-key` header or an Anthropic API key under the `x-anthropic-key` header",
+            }, { status: 401 });
+          }
+          if (openaiKey && anthropicKey) {
+            return Response.json({
+              detail:
+                "You can provide only one of `x-openai-key` and `x-anthropic-key` header",
+            }, { status: 400 });
+          }
+          const provider: Provider = openaiKey ? "openai" : "anthropic";
+          const apiKey = (openaiKey ?? anthropicKey) as string;
+          try {
+            const data = await request.json();
+            const validated = v.parse(AgentRequestSchema, data);
+            const agent = new DOLightAgent({
+              model: validated.model,
+              db: env.DB,
+              bucket: env.FS,
+              provider,
+              apiKey,
+              baseUrl: validated.base_url,
+              system: validated.system,
+              promptCaching: validated.prompt_caching,
+              autoSkillDiscovery: validated.auto_skill_discovery,
+              skillsList: validated.skills,
+              parallelToolCalls: validated.parallel_tool_calls,
+            });
+            await agent.checkForMigrations();
+            await agent.initWasm();
+            const controller = new AbortController();
+            request.signal.addEventListener("abort", () => controller.abort());
+            const signal = controller.signal;
+            const stream = new ReadableStream<Uint8Array>({
+              async start(streamController) {
+                const encoder = new TextEncoder();
+                try {
+                  for await (
+                    const chunk of agent.run(validated.prompt, {
+                      sessionId: validated.session_id,
+                      abortSignal: signal,
+                    })
+                  ) {
+                    if (controller.signal.aborted) break;
+                    streamController.enqueue(
+                      encoder.encode(JSON.stringify(chunk) + "\n"),
+                    );
+                  }
+                  streamController.close();
+                } catch (err) {
+                  streamController.error(err);
+                }
+              },
+              cancel(reason) {
+                // Fires if the *consumer* of this stream cancels it (e.g. client aborts mid-read)
+                controller.abort(reason);
+              },
+            });
+            return new Response(stream, {
+              headers: { "Content-Type": "application/x-ndjson" },
+            });
+          } catch (e) {
+            return Response.json({
+              detail: `An error occurred while running your agent: ${e}`,
+              stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack",
+            }, { status: 500 });
+          }
+        }
         case "/repos": {
           const token = request.headers.get("x-github-token");
           if (!token) {
@@ -35,15 +126,18 @@ export default {
           try {
             const data = await request.json();
             const validated = v.parse(ReposRequestSchema, data);
-            const dir = await uploader.gitClone(validated.url, token, {
-              branch: validated.branch,
-            });
+            const dir = await uploader.gitClone(
+              validated.owner,
+              validated.name,
+              token,
+              validated.ref,
+            );
             return Response.json({ directory: dir }, { status: 200 });
           } catch (e) {
             return Response.json({
               detail:
                 `An error occurred while trying to download the GitHub repository: ${e}`,
-              stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack"
+              stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack",
             }, { status: 500 });
           }
         }
@@ -80,7 +174,7 @@ export default {
             return Response.json({
               detail:
                 `An error occurred while trying to read the file to text: ${e}. Provided files should always be text-based`,
-                stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack"
+              stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack",
             }, { status: 400 });
           }
           try {
@@ -89,7 +183,7 @@ export default {
           } catch (e) {
             return Response.json({
               detail: `An error occurred while trying to upload the file: ${e}`,
-              stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack"
+              stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack",
             }, { status: 500 });
           }
         }
@@ -108,7 +202,7 @@ export default {
             return Response.json({
               detail:
                 `An error occurred while trying to upload the skill: ${e}`,
-                stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack"
+              stack: e instanceof Error ? (e.stack ?? "no stack") : "no stack",
             }, { status: 500 });
           }
         }
