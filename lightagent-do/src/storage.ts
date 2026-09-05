@@ -12,7 +12,7 @@ export class DOSqlStatement<T extends object> implements SqlStatement<T> {
   }
 
   async all(...parameters: SqlBindParameters): Promise<T[]> {
-    const result = await this.base.bind(parameters).all<T>();
+    const result = await this.base.bind(...parameters).all<T>();
     if (result.success) {
       return result.results;
     }
@@ -24,7 +24,7 @@ export class DOSqlStatement<T extends object> implements SqlStatement<T> {
   }
 
   async get(...parameters: SqlBindParameters): Promise<T | undefined> {
-    const result = await this.base.bind(parameters).first<T>();
+    const result = await this.base.bind(...parameters).first<T>();
     if (!result) {
       return undefined;
     }
@@ -40,7 +40,11 @@ export class DOSqliteClient implements SqliteClient {
   }
 
   async exec(sql: string, ...parameters: SqlBindParameters): Promise<void> {
-    await this.base.prepare(sql).bind(parameters).run();
+    if (parameters.length === 0) {
+      await this.base.exec(sql);
+      return;
+    }
+    await this.base.prepare(sql).bind(...parameters).run();
   }
 
   // deno-lint-ignore require-await

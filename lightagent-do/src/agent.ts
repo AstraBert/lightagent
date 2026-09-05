@@ -5,23 +5,19 @@ import {
   convertEventsToMessages,
   EditTool,
   JsonValue,
-  McpTool,
   messageToAssistantContent,
   Provider,
   ReadTool,
   SessionInitType,
-  ShellTool,
   SkillsClient,
   SkillsTool,
   ToolResult,
   Usage,
   WriteTool,
 } from "@cle-does-things/lightagent-core";
-import { McpClient, McpServer } from "@cle-does-things/lightagent-core/mcp";
-import { LocalFileSystem } from "./fs.ts";
-import { getDbPath, LocalSqliteClient } from "./storage.ts";
-import { LocalShell } from "./shell.ts";
-import { LocalEnvironment } from "./environment.ts";
+import { DOFileSystem } from "./fs.ts";
+import { DOSqliteClient } from "./storage.ts";
+import { GrepTool, ReadDirTool, UnixTool } from "./tools.ts";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import {
   type ApiType,
@@ -72,38 +68,6 @@ seems compelling enough for the task at hand.
 </guidelines>`;
 const MAX_CONCURRENT_TOOL_CALLS = 10;
 
-function resolveCredentials(
-  env: LocalEnvironment,
-  provider?: Provider,
-  apiKey?: string,
-): { provider: Provider; apiKey: string } {
-  if (apiKey && provider) {
-    return { provider, apiKey };
-  } else if (!apiKey && provider) {
-    const key = env.get(`${provider.toUpperCase()}_API_KEY`);
-    if (!key) {
-      throw new Error(
-        `Could not find ${provider.toUpperCase()}_API_KEY in the current environment`,
-      );
-    }
-    return { provider, apiKey: key };
-  } else if (!apiKey && !provider) {
-    const openaiKey = env.get("OPENAI_API_KEY");
-    if (openaiKey) {
-      return { provider: "openai", apiKey: openaiKey };
-    }
-    const anthropicKey = env.get("ANTHROPIC_API_KEY");
-    if (anthropicKey) {
-      return { provider: "anthropic", apiKey: anthropicKey };
-    }
-    throw new Error(
-      "Neither OPENAI_API_KEY nor ANTHROPIC_API_KEY are in the current environment, could not infer provider",
-    );
-  } else {
-    throw new Error("Cannot infer provider from the API key only");
-  }
-}
-
 function defaultUsage(sessionStart: Date): Usage {
   return {
     cacheReadTokens: 0,
@@ -114,7 +78,7 @@ function defaultUsage(sessionStart: Date): Usage {
   };
 }
 
-export class LocalLightAgent {
+export class DOLightAgent {
   provider: Provider;
   baseUrl: string;
   model: string;
@@ -125,20 +89,19 @@ export class LocalLightAgent {
   promptCaching: boolean;
   parallelToolCalls: boolean;
   private history: Message[] = [];
-  private env: LocalEnvironment = new LocalEnvironment();
   private skills: Map<string, string> = new Map();
-  private fs: LocalFileSystem = new LocalFileSystem();
-  private shell: LocalShell = new LocalShell();
-  private db: LocalSqliteClient;
+  private fs: DOFileSystem;
+  private db: DOSqliteClient;
   private storage: AgentStorage;
   private skillsClient: SkillsClient;
   private tools: {
-    shell: ShellTool;
+    read_dir: ReadDirTool;
+    grep: GrepTool;
+    unix_tools: UnixTool;
     edit: EditTool;
     write: WriteTool;
     read: ReadTool;
     skills: SkillsTool;
-    mcp?: McpTool;
   };
   private resolvedSkills: boolean = false;
   private resolvedSystem: boolean = false;
@@ -146,26 +109,22 @@ export class LocalLightAgent {
 
   constructor(options: {
     model: string;
-    provider?: Provider;
-    apiKey?: string;
+    provider: Provider;
+    apiKey: string;
+    bucket: R2Bucket;
+    db: D1Database;
     baseUrl?: string;
     system?: { content: string; append: boolean };
     autoSkillDiscovery?: boolean;
     skillsList?: string[];
     promptCaching?: boolean;
     parallelToolCalls?: boolean;
-    mcpServers?: Record<string, McpServer>;
   }) {
     this.model = options.model;
-    const { provider, apiKey } = resolveCredentials(
-      this.env,
-      options.provider,
-      options.apiKey,
-    );
-    this.provider = provider;
-    this.apiKey = apiKey;
+    this.provider = options.provider;
+    this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl ??
-      (provider == "openai"
+      (options.provider == "openai"
         ? DEFAULT_OPENAI_BASE_URL
         : DEFAULT_ANTHROPIC_BASE_URL);
     this.autoSkillDiscovery = options.autoSkillDiscovery ??
@@ -178,20 +137,19 @@ export class LocalLightAgent {
       : DEFAULT_SYSTEM_PROMPT;
     this.promptCaching = options.promptCaching ?? true;
     this.parallelToolCalls = options.parallelToolCalls ?? false;
-    this.db = new LocalSqliteClient(getDbPath(this.fs));
-    this.storage = new AgentStorage(this.db, "named");
+    this.fs = new DOFileSystem(options.bucket);
+    this.db = new DOSqliteClient(options.db);
+    this.storage = new AgentStorage(this.db, "anonymous");
     this.skillsClient = new SkillsClient(this.fs);
     this.tools = {
       edit: new EditTool(this.fs),
       read: new ReadTool(this.fs),
       write: new WriteTool(this.fs),
       skills: new SkillsTool(this.skillsClient),
-      shell: new ShellTool(this.shell),
+      read_dir: new ReadDirTool(this.fs),
+      grep: new GrepTool(this.fs),
+      unix_tools: new UnixTool(this.fs),
     };
-    if (options.mcpServers) {
-      const mcpClient = new McpClient(options.mcpServers);
-      this.tools.mcp = new McpTool(mcpClient);
-    }
   }
 
   async initWasm() {
@@ -416,7 +374,7 @@ export class LocalLightAgent {
         api_key: this.apiKey,
         stream: true,
         messages: this.history,
-        tools: Object.values(this.tools).filter((t) => typeof t !== "undefined")
+        tools: Object.values(this.tools)
           .map((t) => t.toSdkTool()),
         parallel_tool_calls: this.parallelToolCalls,
         prompt_cache_ttl: this.promptCaching
@@ -678,11 +636,35 @@ export class LocalLightAgent {
             yield skillLoadEvent;
           }
           switch (toolCall.name) {
-            case "shell": {
+            case "grep": {
               promises.push(
                 limit(() =>
                   executeToolWithCallId(
-                    this.tools.shell.execute.bind(this.tools.shell),
+                    this.tools.grep.execute.bind(this.tools.grep),
+                    toolCall.arguments,
+                    toolCall.id,
+                  )
+                ),
+              );
+              break;
+            }
+            case "unix_tools": {
+              promises.push(
+                limit(() =>
+                  executeToolWithCallId(
+                    this.tools.unix_tools.execute.bind(this.tools.unix_tools),
+                    toolCall.arguments,
+                    toolCall.id,
+                  )
+                ),
+              );
+              break;
+            }
+            case "read_dir": {
+              promises.push(
+                limit(() =>
+                  executeToolWithCallId(
+                    this.tools.read_dir.execute.bind(this.tools.read_dir),
                     toolCall.arguments,
                     toolCall.id,
                   )
@@ -728,17 +710,6 @@ export class LocalLightAgent {
                 limit(() =>
                   executeToolWithCallId(
                     this.tools.skills.execute.bind(this.tools.skills),
-                    toolCall.arguments,
-                    toolCall.id,
-                  )
-                ),
-              );
-              break;
-            case "mcp":
-              promises.push(
-                limit(() =>
-                  executeToolWithCallId(
-                    this.tools.mcp!.execute.bind(this.tools.mcp!),
                     toolCall.arguments,
                     toolCall.id,
                   )

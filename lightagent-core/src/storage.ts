@@ -1,6 +1,6 @@
 import { type AgentEvent, AgentEventSchema } from "./events.ts";
 import * as v from "valibot";
-import { applyMigrations } from "./apply-migrations.ts";
+import { applyMigrations, type BindType } from "./apply-migrations.ts";
 
 export type SqlBindValue =
   | number
@@ -32,31 +32,52 @@ export interface SqliteClient {
   prepare<T extends object>(sql: string): Promise<SqlStatement<T>>;
 }
 
+function writeQuery(query: string, paramNames: string[]): string {
+  let mutable = query;
+  for (const paramName of paramNames) {
+    mutable = mutable.replace("?", paramName);
+  }
+  return mutable;
+}
+
 export class AgentStorage {
+  bindType: BindType;
   private db: SqliteClient;
   private initialized: boolean;
 
-  constructor(db: SqliteClient) {
+  constructor(db: SqliteClient, bindType: BindType) {
+    this.bindType = bindType;
     this.db = db;
     this.initialized = false;
   }
 
   async initStorage(): Promise<void> {
     if (!this.initialized) {
-      await applyMigrations(this.db);
+      await applyMigrations(this.db, this.bindType);
       this.initialized = true;
     }
   }
 
   async store(event: AgentEvent): Promise<void> {
     await this.initStorage();
-    await this.db.exec(
-      "insert into events (session_id, payload, created_at) values (:sessionId, :payload, :createdAt)",
-      {
+    let query =
+      "insert into events (session_id, payload, created_at) values (?, ?, ?)";
+    let binds: { sessionId: string; payload: string; createdAt: number } | [
+      string,
+      string,
+      number,
+    ] = [event.sessionId, JSON.stringify(event), Number(event.timestamp)];
+    if (this.bindType === "named") {
+      query = writeQuery(query, [":sessionId", ":payload", ":createdAt"]);
+      binds = {
         sessionId: event.sessionId,
         payload: JSON.stringify(event),
         createdAt: Number(event.timestamp),
-      },
+      };
+    }
+    await this.db.exec(
+      query,
+      binds,
     );
   }
 
@@ -66,12 +87,25 @@ export class AgentStorage {
   ): Promise<AgentEvent[]> {
     await this.initStorage();
     let sql =
-      "select payload from events where session_id = :sessionId order by id, created_at";
-    let params: Record<string, string | number> = { sessionId };
+      "select payload from events where session_id = ? order by id, created_at";
+    let params: Record<string, string | number> | (string | number)[] = [
+      sessionId,
+    ];
+    if (this.bindType === "named") {
+      sql = writeQuery(sql, [":sessionId"]);
+      params = { sessionId };
+    }
     if (afterTimestamp) {
       sql =
-        "select payload from events where session_id = :sessionId and created_at > :timestamp order by id, created_at";
-      params = { sessionId, timestamp: afterTimestamp };
+        "select payload from events where session_id = ? and created_at > ? order by id, created_at";
+      params = [sessionId, afterTimestamp];
+      if (this.bindType === "named") {
+        sql = writeQuery(sql, [":sessionId", ":timestamp"]);
+        params = {
+          sessionId,
+          timestamp: afterTimestamp,
+        };
+      }
     }
     const stmt = await this.db.prepare<{ payload: string }>(sql);
     const events = await stmt.all(params);
