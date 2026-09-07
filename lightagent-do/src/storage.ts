@@ -14,7 +14,7 @@ export class DOSqlStatement<T extends object> implements SqlStatement<T> {
   async all(parameters?: SqlBindParameters): Promise<T[]> {
     let result;
     if (!parameters) {
-      result = await this.base.all<T>()
+      result = await this.base.all<T>();
     } else {
       result = await this.base.bind(...parameters).all<T>();
     }
@@ -31,7 +31,7 @@ export class DOSqlStatement<T extends object> implements SqlStatement<T> {
   async get(parameters?: SqlBindParameters): Promise<T | undefined> {
     let result;
     if (!parameters) {
-      result = await this.base.first<T>()
+      result = await this.base.first<T>();
     } else {
       result = await this.base.bind(...parameters).first<T>();
     }
