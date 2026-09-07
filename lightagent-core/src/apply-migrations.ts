@@ -1,4 +1,4 @@
-import type { SqliteClient } from "./storage.ts";
+import type { SqlBindParameters, SqliteClient } from "./storage.ts";
 import { migrations } from "./migrations/mod.ts";
 
 export type BindType = "anonymous" | "named";
@@ -40,6 +40,6 @@ export async function applyMigrations(
       query = "insert into _migrations (version, applied_at) values (?, ?)";
       binds = [m.version, Number(timestamp)];
     }
-    await db.exec(query, binds);
+    await db.exec(query, binds as SqlBindParameters);
   }
 }

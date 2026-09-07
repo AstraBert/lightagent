@@ -20,14 +20,14 @@ export type SqlBindParameters = SqlBindValue[] | [SqlBindParameters];
 /* SQL statement, resulting from a `prepare` operation */
 export interface SqlStatement<T> {
   /* Fetch all records associated with the statement */
-  all(...parameters: SqlBindParameters): Promise<T[]>;
+  all(parameters?: SqlBindParameters): Promise<T[]>;
   /* Fetch the first record associated with the statement, if any */
-  get(...parameters: SqlBindParameters): Promise<T | undefined>;
+  get(parameters?: SqlBindParameters): Promise<T | undefined>;
 }
 
 export interface SqliteClient {
   /* Execute a non-readonly SQL statement, optionally specifying bind parameters */
-  exec(sql: string, ...parameters: SqlBindParameters): Promise<void>;
+  exec(sql: string, parameters?: SqlBindParameters): Promise<void>;
   /* Execute a `select` statement, optionally specifying bind parameters */
   prepare<T extends object>(sql: string): Promise<SqlStatement<T>>;
 }
@@ -77,7 +77,7 @@ export class AgentStorage {
     }
     await this.db.exec(
       query,
-      binds,
+      binds as SqlBindParameters,
     );
   }
 
@@ -108,7 +108,7 @@ export class AgentStorage {
       }
     }
     const stmt = await this.db.prepare<{ payload: string }>(sql);
-    const events = await stmt.all(params);
+    const events = await stmt.all(params as SqlBindParameters);
     const agentEvents: AgentEvent[] = [];
     for (const event of events) {
       const data = JSON.parse(event.payload, (key, value) => {

@@ -28,6 +28,8 @@ import {
   type ToolCallPart,
 } from "@cle-does-things/llms-sdk-wasm";
 import init, * as sdk from "@cle-does-things/llms-sdk-wasm";
+// @ts-ignore this should work
+import wasmModule from "@cle-does-things/llms-sdk-wasm/llms_sdk_wasm_bg.wasm"
 import { crypto } from "@std/crypto/crypto";
 import pLimit from "p-limit";
 
@@ -154,7 +156,7 @@ export class DOLightAgent {
 
   async initWasm() {
     if (!this.wasmInited) {
-      await init();
+      await init(wasmModule);
     }
   }
 

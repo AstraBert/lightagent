@@ -17,13 +17,21 @@ export class LocalSqlStatement<T extends object> implements SqlStatement<T> {
   }
 
   // deno-lint-ignore require-await
-  async all(...parameters: SqlBindParameters): Promise<T[]> {
-    return this.base.all(...parameters);
+  async all(parameters?: SqlBindParameters): Promise<T[]> {
+    if (!parameters) {
+      return this.base.all()
+    } else {
+      return this.base.all(parameters);
+    }
   }
 
   // deno-lint-ignore require-await
-  async get(...parameters: SqlBindParameters): Promise<T | undefined> {
-    return this.base.get(...parameters);
+  async get(parameters?: SqlBindParameters): Promise<T | undefined> {
+    if (!parameters) {
+      return this.base.get()
+    } else {
+      return this.base.get(parameters);
+    }
   }
 }
 
@@ -45,9 +53,13 @@ export class LocalSqliteClient implements SqliteClient {
     }
   }
 
-  async exec(sql: string, ...parameters: SqlBindParameters): Promise<void> {
+  async exec(sql: string, parameters?: SqlBindParameters): Promise<void> {
     await this.initDb(this.fs);
-    this.db!.exec(sql, ...parameters);
+    if (!parameters) {
+      this.db!.exec(sql)
+    } else {
+      this.db!.exec(sql, parameters);
+    }
   }
 
   async prepare<T extends object>(sql: string): Promise<SqlStatement<T>> {

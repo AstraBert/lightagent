@@ -13,5 +13,8 @@ await esbuild.build({
   alias: {
     "safe-buffer": "./shims/safe-buffer.ts",
   },
+  loader: {
+    ".wasm": "binary",
+  },
 });
 esbuild.stop();
