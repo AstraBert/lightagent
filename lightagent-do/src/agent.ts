@@ -157,7 +157,7 @@ export class DOLightAgent {
   async initWasm() {
     if (!this.wasmInited) {
       const module = new WebAssembly.Module(wasmModule);
-      await init({module_or_path: module});
+      await init({ module_or_path: module });
     }
   }
 
@@ -488,7 +488,7 @@ export class DOLightAgent {
             yield errEvent;
             break;
           }
-          console.log(JSON.stringify(item.chunk))
+          console.log(JSON.stringify(item.chunk));
           yield item.chunk;
           break;
         } else if (item.done && !item.chunk) {
