@@ -23,6 +23,8 @@
     "jsr:@std/path@^1.0.6": "1.1.6",
     "jsr:@std/path@^1.1.5": "1.1.6",
     "jsr:@std/path@^1.1.6": "1.1.6",
+    "jsr:@std/streams@^1.0.17": "1.1.2",
+    "jsr:@std/tar@~0.1.10": "0.1.10",
     "jsr:@std/toml@^1.0.3": "1.0.11",
     "jsr:@std/yaml@^1.0.5": "1.2.0",
     "npm:@cle-does-things/llms-sdk-wasm@~0.1.1": "0.1.1_typescript@5.9.3",
@@ -115,6 +117,15 @@
       "integrity": "c68485c2a4dfbb5ae3cc74fae4e8c4e5d874cf8a8ed12927917235c758b46cbe",
       "dependencies": [
         "jsr:@std/internal@^1.0.14"
+      ]
+    },
+    "@std/streams@1.1.2": {
+      "integrity": "0249bf9b78a999f57032ca4d8e7ccaa57579090242640b35ddc948fbb745d3af"
+    },
+    "@std/tar@0.1.10": {
+      "integrity": "6bf907f3a4bc8bfef42973ba132d946756a6161ef6b914a9e1c06debe664db17",
+      "dependencies": [
+        "jsr:@std/streams"
       ]
     },
     "@std/toml@1.0.11": {
@@ -1088,6 +1099,7 @@
         "dependencies": [
           "jsr:@libs/diff@4",
           "jsr:@luca/esbuild-deno-loader@~0.11.1",
+          "jsr:@std/tar@~0.1.10",
           "npm:@cloudflare/workers-types@^5.20260828.1",
           "npm:esbuild@~0.28.2",
           "npm:isomorphic-git@^1.41.9"

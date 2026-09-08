@@ -27,6 +27,14 @@ export class DOFileSystem implements FileSystem {
     await this.base.put(this.pathToKey(path), content);
   }
 
+  // DOFileSystem implementation
+  async writeStream(
+    path: string,
+    content: ReadableStream<Uint8Array<ArrayBufferLike>>,
+  ): Promise<void> {
+    await this.base.put(this.pathToKey(path), content);
+  }
+
   cwd(): string {
     return this.baseDir;
   }

@@ -32,6 +32,7 @@ export interface DirEntry {
 }
 
 export class FileNotFoundError extends Error {
+  code = "ENOENT"; // isomorphic-git checks err.code, not instanceof or message text
   constructor(message: string) {
     super(message);
     this.name = "FileNotFoundError";

@@ -10,5 +10,11 @@ await esbuild.build({
   format: "esm",
   platform: "browser", // no Node builtins available in the Worker isolate anyway,
   external: [],
+  alias: {
+    "safe-buffer": "./shims/safe-buffer.ts",
+  },
+  loader: {
+    ".wasm": "binary",
+  },
 });
 esbuild.stop();
