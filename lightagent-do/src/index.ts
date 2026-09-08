@@ -82,6 +82,7 @@ export default {
             const signal = controller.signal;
             const stream = new ReadableStream<Uint8Array>({
               async start(streamController) {
+                console.log("Stream has started")
                 const encoder = new TextEncoder();
                 try {
                   for await (
