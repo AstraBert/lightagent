@@ -6,6 +6,7 @@
     "jsr:@libs/diff@4": "4.0.0",
     "jsr:@luca/esbuild-deno-loader@~0.11.1": "0.11.1",
     "jsr:@std/assert@1": "1.0.19",
+    "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/bytes@^1.0.2": "1.0.6",
     "jsr:@std/cli@^1.0.32": "1.0.32",
     "jsr:@std/collections@^1.1.3": "1.3.0",
@@ -29,13 +30,14 @@
     "jsr:@std/yaml@^1.0.5": "1.2.0",
     "npm:@cle-does-things/llms-sdk-wasm@~0.1.1": "0.1.1_typescript@5.9.3",
     "npm:@cloudflare/workers-types@^5.20260828.1": "5.20260828.1",
-    "npm:@modelcontextprotocol/sdk@*": "1.30.0_zod@4.5.2",
-    "npm:@modelcontextprotocol/sdk@^1.30.0": "1.30.0_zod@4.5.2",
+    "npm:@modelcontextprotocol/sdk@*": "1.30.0_zod@3.25.76",
+    "npm:@modelcontextprotocol/sdk@^1.30.0": "1.30.0_zod@3.25.76",
     "npm:@valibot/to-json-schema@^1.7.1": "1.7.1_valibot@1.4.2__typescript@5.9.3_typescript@5.9.3",
     "npm:esbuild@~0.28.2": "0.28.2",
     "npm:isomorphic-git@^1.41.9": "1.41.9",
     "npm:p-limit@^7.3.1": "7.3.1",
-    "npm:valibot@^1.4.2": "1.4.2_typescript@5.9.3"
+    "npm:valibot@^1.4.2": "1.4.2_typescript@5.9.3",
+    "npm:zod@^3.25.0": "3.25.76"
   },
   "jsr": {
     "@db/sqlite@0.13.0": {
@@ -284,7 +286,7 @@
         "hono"
       ]
     },
-    "@modelcontextprotocol/sdk@1.30.0_zod@4.5.2": {
+    "@modelcontextprotocol/sdk@1.30.0_zod@3.25.76": {
       "integrity": "sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==",
       "dependencies": [
         "@hono/node-server",
@@ -1068,18 +1070,19 @@
     "yocto-queue@1.2.2": {
       "integrity": "sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ=="
     },
-    "zod-to-json-schema@3.25.2_zod@4.5.2": {
+    "zod-to-json-schema@3.25.2_zod@3.25.76": {
       "integrity": "sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==",
       "dependencies": [
         "zod"
       ]
     },
-    "zod@4.5.2": {
-      "integrity": "sha512-XkYXCol10+ba/6F/cueWV+TezUeOqXW0hdeJt5CdXjTYeAgAQg5N03RQdJ80mhfFE72+pblvYMW4wy2Qp4Qbrg=="
+    "zod@3.25.76": {
+      "integrity": "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="
     }
   },
   "workspace": {
     "dependencies": [
+      "jsr:@std/assert@^1.0.19",
       "jsr:@std/crypto@^1.1.0",
       "jsr:@std/path@^1.1.6",
       "npm:@cle-does-things/llms-sdk-wasm@~0.1.1",
@@ -1092,7 +1095,8 @@
         "dependencies": [
           "jsr:@std/assert@1",
           "jsr:@std/front-matter@^1.0.9",
-          "npm:@modelcontextprotocol/sdk@^1.30.0"
+          "npm:@modelcontextprotocol/sdk@^1.30.0",
+          "npm:zod@^3.25.0"
         ]
       },
       "lightagent-do": {
