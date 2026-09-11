@@ -11,7 +11,7 @@
   },
   "tasks": {
     "new-migration": "./scripts/generate-migration.py",
-    "test": "deno test --allow-all lightagent-core/tests/"
+    "test": "deno test --allow-all lightagent-core/tests/ lightagent-local/tests/"
   },
   "lint": {
     "rules": {
