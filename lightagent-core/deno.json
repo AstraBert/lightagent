@@ -5,6 +5,9 @@
     ".": "./mod.ts",
     "./mcp": "./src/mcp.ts"
   },
+  "tasks": {
+    "test": "deno test -A"
+  },
   "imports": {
     "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1.30.0",
     "@std/assert": "jsr:@std/assert@1",

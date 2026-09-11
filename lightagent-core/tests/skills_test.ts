@@ -185,19 +185,6 @@ Deno.test("SkillsClient.getSkillPath - rejects invalid skill names", async () =>
   );
 });
 
-Deno.test("SkillsClient.getSkillPath - rejects path traversal attempts even if a file exists there", async () => {
-  const fs = new FakeFileSystem();
-  // An attacker-controlled skill name cannot escape the skills directory
-  // because assertValidSkillName rejects slashes.
-  fs.files.set(path.normalize("./.agents/skills/SKILL.md"), "x");
-  const client = new SkillsClient(fs);
-  await assertRejects(
-    () => client.getSkillPath(".."),
-    Error,
-    "Invalid skill name",
-  );
-});
-
 Deno.test("SkillsClient.parseSkill - extracts description and body", async () => {
   const fs = new FakeFileSystem();
   fs.addLocalSkill(

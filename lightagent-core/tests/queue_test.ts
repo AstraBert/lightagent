@@ -48,7 +48,7 @@ Deno.test("AsyncQueue - interleaved pushes and nexts preserve order", async () =
   assertEquals(await c, { chunk: 3 });
 });
 
-Deno.test("AsyncQueue - supports done and error sentinel items", async () => {
+Deno.test("AsyncQueue - supports done sentinel items", async () => {
   const queue = new AsyncQueue<number>();
   queue.push({ chunk: 1 });
   queue.push({ done: true });

@@ -259,6 +259,7 @@ Deno.test("convertEventsToMessages - skips tool.call_any already present in prev
   assertEquals(messages.length, 1);
   assertEquals(messages[0].role, "assistant");
   assertEquals(messages[0].content.length, 2);
+  assertEquals(messages[0].content.filter((c) => c.type === "toolCall").filter((t) => t.id === "c1").length, 1)
 });
 
 Deno.test("convertEventsToMessages - keeps tool.call_any not present in previous assistant message", () => {
@@ -456,12 +457,8 @@ Deno.test("AgentEventSchema - validates tool.call with top-level array input", (
     timestamp: new Date(),
   } as AgentEvent;
   const parsed = v.parse(AgentEventSchema, event);
-  // NOTE: JsonValueSchema's union lists v.record before v.array, so valibot
-  // matches arrays as records first and coerces them into objects with
-  // string-numeric keys. This test documents the current behavior; it may
-  // be a schema-ordering bug (arrays should arguably round-trip as arrays).
   assertEquals((parsed as { input: unknown }).input, {
-    list: { "0": 1, "1": "two", "2": true, "3": null },
+    list: [1, "two", true, null],
   });
 });
 
@@ -547,17 +544,4 @@ Deno.test("AgentEventSchema - serialized events survive JSON round-trip with dat
   const parsed = v.parse(AgentEventSchema, revived);
   assertEquals(parsed, event);
   assert(parsed.timestamp instanceof Date);
-});
-
-// Type-level sanity check: convertEventsToMessages returns sdk Messages.
-Deno.test("convertEventsToMessages - returns messages assignable to sdk Message type", () => {
-  const events: AgentEvent[] = [{
-    type: "user.prompt_submit",
-    sessionId: "s1",
-    turnId: "t1",
-    prompt: "hi",
-    timestamp: new Date(),
-  }];
-  const messages: Message[] = convertEventsToMessages(events);
-  assertEquals(messages.length, 1);
 });

@@ -29,8 +29,8 @@ const JsonValueSchema: v.GenericSchema<JsonData> = v.lazy(() =>
     v.number(),
     v.boolean(),
     v.null(),
-    v.record(v.string(), JsonValueSchema),
     v.array(JsonValueSchema),
+    v.record(v.string(), JsonValueSchema),
   ])
 );
 export type JsonValue = v.InferOutput<typeof JsonValueSchema>;
