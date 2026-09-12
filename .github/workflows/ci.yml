@@ -59,3 +59,24 @@ jobs:
       - name: Run local tests
         run: deno test -A
         working-directory: lightagent-local
+
+  durable-object:
+    name: DO Agent CI
+    runs-on: ubuntu-latest
+    needs: [workspace]
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v6
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Install deps
+        run: deno install
+
+      - name: Build DO agent
+        run: deno task bundle
+        working-directory: lightagent-do
