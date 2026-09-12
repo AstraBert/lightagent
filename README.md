@@ -7,10 +7,10 @@ Lightweight CLI agent, built on [Deno](https://deno.com).
 
 ## Project Status
 
-| Package            | Status         | Description                                            |
-| ------------------ | -------------- | ------------------------------------------------------ |
-| `lightagent-core`  | 🔶 Beta        | Common interfaces and types shared across all packages |
-| `lightagent-local` | 🔶 Beta        | Ready for general use, but expect rough edges          |
+| Package            | Status          | Description                                            |
+| ------------------ | --------------- | ------------------------------------------------------ |
+| `lightagent-core`  | 🔶 Beta         | Common interfaces and types shared across all packages |
+| `lightagent-local` | 🔶 Beta         | Ready for general use, but expect rough edges          |
 | `lightagent-do`    | 🧪 Experimental | Functional, but not yet ready for general use          |
 
 ## Packages
@@ -22,8 +22,8 @@ ecosystem. This is the foundation that other packages build upon.
 
 ### `lightagent-local`
 
-A local CLI agent that runs on your machine. Currently in **beta**: it works
-and is tested, but may still have rough edges.
+A local CLI agent that runs on your machine. Currently in **beta**: it works and
+is tested, but may still have rough edges.
 
 #### Installation
 
@@ -73,8 +73,8 @@ deno task build
 
 ### `lightagent-do`
 
-Experimental: the Durable Objects implementation works, but it is not yet
-ready for general use. Stay tuned!
+Experimental: the Durable Objects implementation works, but it is not yet ready
+for general use. Stay tuned!
 
 ## Development
 
