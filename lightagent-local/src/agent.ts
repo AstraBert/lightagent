@@ -35,8 +35,8 @@ import init, * as sdk from "@cle-does-things/llms-sdk-wasm";
 import { crypto } from "@std/crypto/crypto";
 import pLimit from "p-limit";
 
-const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
+export const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+export const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
 const DEFAULT_SYSTEM_PROMPT = `<identity>
 You are LightAgent, an AI agent whose purpose is to
 fulfil request coming from a user, employing the tools and skills
@@ -124,13 +124,13 @@ export class LocalLightAgent {
   skillsList: string[];
   promptCaching: boolean;
   parallelToolCalls: boolean;
+  storage: AgentStorage;
   private history: Message[] = [];
   private env: LocalEnvironment = new LocalEnvironment();
   private skills: Map<string, string> = new Map();
   private fs: LocalFileSystem = new LocalFileSystem();
   private shell: LocalShell = new LocalShell();
   private db: LocalSqliteClient;
-  private storage: AgentStorage;
   private skillsClient: SkillsClient;
   private tools: {
     shell: ShellTool;
@@ -197,6 +197,7 @@ export class LocalLightAgent {
   async initWasm() {
     if (!this.wasmInited) {
       await init();
+      this.wasmInited = true;
     }
   }
 

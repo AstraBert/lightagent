@@ -1,7 +1,8 @@
 {
   "tasks": {
     "dev": "deno run --allow-net --allow-env --allow-ffi --allow-read --allow-run --allow-write src/main.ts",
-    "build": "deno compile -A -o lightagent-cli --no-lock --reload --exclude-unused-npm src/main.ts"
+    "build": "deno compile -A -o lightagent-cli --no-lock --reload --exclude-unused-npm src/main.ts",
+    "test:e2e": "deno test -A tests/agent_e2e_test.ts"
   },
   "imports": {
     "@db/sqlite": "jsr:@db/sqlite@^0.13.0",
