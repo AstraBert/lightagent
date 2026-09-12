@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertFalse } from "@std/assert";
 import * as v from "valibot";
-import type { Message, MessagePart } from "@cle-does-things/llms-sdk-wasm";
+import type { MessagePart } from "@cle-does-things/llms-sdk-wasm";
 import {
   type AgentEvent,
   AgentEventSchema,
@@ -259,7 +259,12 @@ Deno.test("convertEventsToMessages - skips tool.call_any already present in prev
   assertEquals(messages.length, 1);
   assertEquals(messages[0].role, "assistant");
   assertEquals(messages[0].content.length, 2);
-  assertEquals(messages[0].content.filter((c) => c.type === "toolCall").filter((t) => t.id === "c1").length, 1)
+  assertEquals(
+    messages[0].content.filter((c) => c.type === "toolCall").filter((t) =>
+      t.id === "c1"
+    ).length,
+    1,
+  );
 });
 
 Deno.test("convertEventsToMessages - keeps tool.call_any not present in previous assistant message", () => {

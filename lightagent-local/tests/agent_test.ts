@@ -305,11 +305,6 @@ Deno.test("LocalLightAgent.getSessionReplay - filters out init, stop and tool.ca
       provider: "openai",
       apiKey: "k",
     });
-    // Access the private storage via a run-less path: use the public
-    // getSessionReplay after inserting events through the storage of a
-    // fresh AgentStorage pointed at the same file. Instead, we use the
-    // writer agent's storage indirectly: checkForMigrations initializes,
-    // then we store via the storage exposed on the object.
     await writer.checkForMigrations();
 
     const usage = {
@@ -363,8 +358,7 @@ Deno.test("LocalLightAgent.getSessionReplay - filters out init, stop and tool.ca
       },
     ];
 
-    // deno-lint-ignore no-explicit-any
-    const storage = (writer as any).storage;
+    const storage = writer.storage;
     for (const event of events) {
       await storage.store(event);
     }

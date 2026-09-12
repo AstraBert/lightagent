@@ -1,8 +1,8 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import * as path from "@std/path";
 import {
-  AgentStorage,
   type AgentEvent,
+  AgentStorage,
 } from "@cle-does-things/lightagent-core";
 import {
   getDbPath,

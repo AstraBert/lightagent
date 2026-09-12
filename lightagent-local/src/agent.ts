@@ -124,13 +124,13 @@ export class LocalLightAgent {
   skillsList: string[];
   promptCaching: boolean;
   parallelToolCalls: boolean;
+  storage: AgentStorage;
   private history: Message[] = [];
   private env: LocalEnvironment = new LocalEnvironment();
   private skills: Map<string, string> = new Map();
   private fs: LocalFileSystem = new LocalFileSystem();
   private shell: LocalShell = new LocalShell();
   private db: LocalSqliteClient;
-  private storage: AgentStorage;
   private skillsClient: SkillsClient;
   private tools: {
     shell: ShellTool;
