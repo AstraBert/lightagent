@@ -28,7 +28,7 @@
     "jsr:@std/tar@~0.1.10": "0.1.10",
     "jsr:@std/toml@^1.0.3": "1.0.11",
     "jsr:@std/yaml@^1.0.5": "1.2.0",
-    "npm:@cle-does-things/llms-sdk-wasm@~0.1.1": "0.1.1_typescript@5.9.3",
+    "npm:@cle-does-things/llms-sdk-wasm@~0.1.2": "0.1.2_typescript@5.9.3",
     "npm:@cloudflare/workers-types@^5.20260828.1": "5.20260828.1",
     "npm:@modelcontextprotocol/sdk@*": "1.30.0_zod@3.25.76",
     "npm:@modelcontextprotocol/sdk@^1.30.0": "1.30.0_zod@3.25.76",
@@ -141,8 +141,8 @@
     }
   },
   "npm": {
-    "@cle-does-things/llms-sdk-wasm@0.1.1_typescript@5.9.3": {
-      "integrity": "sha512-bXwG0FUPPbCkL5sF8p52f1xCHm9OITTROiB0F3LMkWFSAh6zjvcqcX4Ar2VQOdmpaA3ud2g6t7YYSJjh/RW6uw==",
+    "@cle-does-things/llms-sdk-wasm@0.1.2_typescript@5.9.3": {
+      "integrity": "sha512-MiYgN+pRGBTyD3aV17RdZunudyI0+QGB/F/rhDu8+ppsczVJHJtqz0x7rzofW2mIBHHpKhB/xHLWRSNAxbNptg==",
       "dependencies": [
         "typescript"
       ]
@@ -1085,7 +1085,7 @@
       "jsr:@std/assert@^1.0.19",
       "jsr:@std/crypto@^1.1.0",
       "jsr:@std/path@^1.1.6",
-      "npm:@cle-does-things/llms-sdk-wasm@~0.1.1",
+      "npm:@cle-does-things/llms-sdk-wasm@~0.1.2",
       "npm:@valibot/to-json-schema@^1.7.1",
       "npm:p-limit@^7.3.1",
       "npm:valibot@^1.4.2"
