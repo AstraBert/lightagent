@@ -35,11 +35,11 @@ Deno.test("isProvider - rejects invalid values", () => {
   assertFalse(isProvider({}));
 });
 
-Deno.test("isReasoningEffort - accepts valid providers", () => {
+Deno.test("isReasoningEffort - accepts valid reasoning efforts", () => {
   assert(isReasoningEffort("none"));
   assert(isReasoningEffort("minimal"));
   assert(isReasoningEffort("low"));
-  assert(isReasoningEffort("medimum"));
+  assert(isReasoningEffort("medium"));
   assert(isReasoningEffort("high"));
   assert(isReasoningEffort("xhigh"));
   assert(isReasoningEffort("maximum"));
