@@ -1,17 +1,23 @@
 import { LocalLightAgent } from "./agent.ts";
 import { EventLogger } from "./logger.ts";
 import { parseArgs } from "@std/cli";
-import { isProvider, Provider } from "@cle-does-things/lightagent-core";
+import {
+  isProvider,
+  isReasoningEffort,
+  Provider,
+} from "@cle-does-things/lightagent-core";
 import {
   McpServer,
   McpServersDefinitionSchema,
 } from "@cle-does-things/lightagent-core/mcp";
 import * as v from "valibot";
+import { ReasoningEffort } from "@cle-does-things/llms-sdk-wasm";
 
-const VERSION = "0.1.4";
+const VERSION = "0.1.5";
+const IS_BETA = true;
 
 const HELP_MESSAGE = `
-\x1b[1;36mLightAgent CLI v${VERSION}\x1b[0m
+\x1b[1;36mLightAgent CLI v${VERSION}${IS_BETA ? " (beta)" : ""}\x1b[0m
 
 A lightweight CLI agent built on Deno.
 
@@ -25,12 +31,17 @@ A lightweight CLI agent built on Deno.
     --provider <PROVIDER>     LLM provider: openai, anthropic (default: auto-detect)
     --api-key <KEY>           API key for the provider
     --base-url <URL>          Custom base URL for the API
+    --no-supports-developer   Do not use 'developer' as the default role for
+                              system messages, use 'system' instead.
 
 \x1b[1mAGENT OPTIONS:\x1b[0m
     --system <PROMPT>         Custom system prompt
     --append-system           Append to default system prompt instead of replacing
     --parallel-tool-calls     Enable parallel tool calls (default: false)
     --no-prompt-caching       Disable prompt caching (default: enabled)
+    --effort <EFFORT>         Reasoning effort for the agent.
+                              Supported values are: none, low, minimal, medium,
+                              high, xhigh, maximum (default: disabled).
 
 \x1b[1mSKILLS & MCP:\x1b[0m
     --skill <SKILL>           Add a skill (can be used multiple times)
@@ -59,7 +70,7 @@ A lightweight CLI agent built on Deno.
     # Resume a previous session
     lightagent-cli --model gpt-5.6-terra --session-id abc123
 
-\x1b[2mNote: This is alpha software. Expect changes and bugs!\x1b[0m
+\x1b[2mNote: This is beta software. Expect changes and bugs!\x1b[0m
 `;
 
 const encoder = new TextEncoder();
@@ -158,6 +169,7 @@ if (import.meta.main) {
       "session-id",
       "skill",
       "mcps-file",
+      "effort",
     ],
     boolean: [
       "parallel-tool-calls",
@@ -167,12 +179,13 @@ if (import.meta.main) {
       "json",
       "help",
       "version",
+      "supports-developer",
     ],
     alias: {
       help: "h",
       version: "v",
     },
-    negatable: ["prompt-caching", "discover-skills"],
+    negatable: ["prompt-caching", "discover-skills", "supports-developer"],
     collect: ["skill"],
     default: {
       provider: undefined,
@@ -187,9 +200,11 @@ if (import.meta.main) {
       "mcps-file": undefined,
       "session-id": undefined,
       "discover-skills": true,
+      effort: undefined,
       json: false,
       help: false,
       version: false,
+      "supports-developer": true,
     },
   });
 
@@ -200,7 +215,7 @@ if (import.meta.main) {
   }
 
   if (cmdOptions.version) {
-    console.log(`lightagent-cli v${VERSION}`);
+    console.log(`lightagent-cli v${VERSION}${IS_BETA ? " (beta)" : ""}`);
     Deno.exit(0);
   }
 
@@ -235,6 +250,15 @@ if (import.meta.main) {
     }
   }
 
+  if (cmdOptions.effort) {
+    if (!isReasoningEffort(cmdOptions.effort)) {
+      console.error(
+        "\x1b[1;31mERROR! Unsupported reasoning effort value. The only supported values are: none, low, minimal, medium, high, xhigh, maximum\x1b[1;39m",
+      );
+      Deno.exit(1);
+    }
+  }
+
   const agent = new LocalLightAgent({
     model: cmdOptions.model,
     mcpServers,
@@ -246,6 +270,8 @@ if (import.meta.main) {
     parallelToolCalls: cmdOptions["parallel-tool-calls"],
     baseUrl: cmdOptions["base-url"],
     autoSkillDiscovery: cmdOptions["discover-skills"],
+    effort: cmdOptions.effort as ReasoningEffort | undefined,
+    supportsDeveloper: cmdOptions["supports-developer"],
   });
 
   await agent.initWasm();
@@ -256,7 +282,9 @@ if (import.meta.main) {
 
   // Interactive CLI mode
   if (!cmdOptions.prompt) {
-    console.log(`\x1b[1;36mLightAgent v${VERSION}\x1b[0m`);
+    console.log(
+      `\x1b[1;36mLightAgent v${VERSION}${IS_BETA ? " (beta)" : ""}\x1b[0m`,
+    );
     console.log(
       "\x1b[2mType your prompt and press Enter. Use Ctrl+C/Ctrl+D or type 'exit' to quit. Use Esc to stop a running session.\x1b[0m\n",
     );

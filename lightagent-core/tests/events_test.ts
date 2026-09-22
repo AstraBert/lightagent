@@ -8,6 +8,7 @@ import {
   type AssistantMessagePart,
   convertEventsToMessages,
   isProvider,
+  isReasoningEffort,
   messageToAssistantContent,
 } from "../src/events.ts";
 
@@ -32,6 +33,26 @@ Deno.test("isProvider - rejects invalid values", () => {
   assertFalse(isProvider(null));
   assertFalse(isProvider(undefined));
   assertFalse(isProvider({}));
+});
+
+Deno.test("isReasoningEffort - accepts valid reasoning efforts", () => {
+  assert(isReasoningEffort("none"));
+  assert(isReasoningEffort("minimal"));
+  assert(isReasoningEffort("low"));
+  assert(isReasoningEffort("medium"));
+  assert(isReasoningEffort("high"));
+  assert(isReasoningEffort("xhigh"));
+  assert(isReasoningEffort("maximum"));
+});
+
+Deno.test("isReasoningEffort - rejects invalid values", () => {
+  assertFalse(isReasoningEffort("zero"));
+  assertFalse(isReasoningEffort("Low"));
+  assertFalse(isReasoningEffort(""));
+  assertFalse(isReasoningEffort(42));
+  assertFalse(isReasoningEffort(null));
+  assertFalse(isReasoningEffort(undefined));
+  assertFalse(isReasoningEffort({}));
 });
 
 Deno.test("messageToAssistantContent - converts text parts", () => {

@@ -90,6 +90,8 @@ export class DOLightAgent {
   skillsList: string[];
   promptCaching: boolean;
   parallelToolCalls: boolean;
+  effort: sdk.ReasoningEffort | undefined = undefined;
+  supportsDeveloper: boolean;
   private history: Message[] = [];
   private skills: Map<string, string> = new Map();
   private fs: DOFileSystem;
@@ -121,8 +123,14 @@ export class DOLightAgent {
     skillsList?: string[];
     promptCaching?: boolean;
     parallelToolCalls?: boolean;
+    effort?: sdk.ReasoningEffort;
+    supportsDeveloper?: boolean;
   }) {
     this.model = options.model;
+    this.effort = options.effort;
+    this.supportsDeveloper = typeof options.supportsDeveloper === "undefined"
+      ? true
+      : options.supportsDeveloper;
     this.provider = options.provider;
     this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl ??
@@ -389,6 +397,7 @@ export class DOLightAgent {
       let assistantMessage: Message | null = null;
       sdk.streamChat(
         request,
+        this.supportsDeveloper,
         (err: string | null, chunk?: LLMStreamingResponse) => {
           if (options.abortSignal.aborted) {
             queue.push({ done: true, isInterrupt: true });

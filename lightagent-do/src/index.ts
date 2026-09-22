@@ -1,6 +1,9 @@
 import * as v from "valibot";
 import { FileUploader } from "./uploader.ts";
-import { Provider } from "@cle-does-things/lightagent-core";
+import {
+  Provider,
+  ReasoningEffortSchema,
+} from "@cle-does-things/lightagent-core";
 import { DOLightAgent } from "./agent.ts";
 
 interface DOEnv {
@@ -21,6 +24,8 @@ const AgentRequestSchema = v.object({
   })),
   prompt: v.string(),
   session_id: v.optional(v.string()),
+  effort: ReasoningEffortSchema,
+  supports_developer: v.optional(v.boolean()),
 });
 
 const ReposRequestSchema = v.object({
@@ -74,6 +79,8 @@ export default {
               autoSkillDiscovery: validated.auto_skill_discovery,
               skillsList: validated.skills,
               parallelToolCalls: validated.parallel_tool_calls,
+              supportsDeveloper: validated.supports_developer,
+              effort: validated.effort,
             });
             await agent.checkForMigrations();
             await agent.initWasm();

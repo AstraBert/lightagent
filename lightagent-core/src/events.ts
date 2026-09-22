@@ -3,6 +3,7 @@ import type {
   Message,
   MessagePart,
   MessageRole,
+  ReasoningEffort,
 } from "@cle-does-things/llms-sdk-wasm";
 
 const SessionInitTypeSchema = v.picklist(["new", "resume"]);
@@ -11,9 +12,22 @@ const ProviderSchema = v.picklist(["anthropic", "openai"]);
 export type Provider = v.InferOutput<typeof ProviderSchema>;
 const DeltaTypeSchema = v.picklist(["text", "thinking"]);
 export type DeltaType = v.InferOutput<typeof DeltaTypeSchema>;
+export const ReasoningEffortSchema = v.picklist([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "maximum",
+]);
 
 export function isProvider(value: unknown): value is Provider {
   return v.is(ProviderSchema, value);
+}
+
+export function isReasoningEffort(value: unknown): value is ReasoningEffort {
+  return v.is(ReasoningEffortSchema, value);
 }
 
 export type JsonData =
