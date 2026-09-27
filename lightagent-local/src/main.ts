@@ -31,8 +31,6 @@ A lightweight CLI agent built on Deno.
     --provider <PROVIDER>     LLM provider: openai, anthropic (default: auto-detect)
     --api-key <KEY>           API key for the provider
     --base-url <URL>          Custom base URL for the API
-    --no-supports-developer   Do not use 'developer' as the default role for
-                              system messages, use 'system' instead.
 
 \x1b[1mAGENT OPTIONS:\x1b[0m
     --system <PROMPT>         Custom system prompt
