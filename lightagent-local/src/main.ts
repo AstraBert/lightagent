@@ -13,7 +13,7 @@ import {
 import * as v from "valibot";
 import { ReasoningEffort } from "@cle-does-things/llms-sdk-wasm";
 
-const VERSION = "0.1.5";
+const VERSION = "0.1.6";
 const IS_BETA = true;
 
 const HELP_MESSAGE = `
