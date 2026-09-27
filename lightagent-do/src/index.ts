@@ -25,7 +25,6 @@ const AgentRequestSchema = v.object({
   prompt: v.string(),
   session_id: v.optional(v.string()),
   effort: ReasoningEffortSchema,
-  supports_developer: v.optional(v.boolean()),
 });
 
 const ReposRequestSchema = v.object({
@@ -79,7 +78,6 @@ export default {
               autoSkillDiscovery: validated.auto_skill_discovery,
               skillsList: validated.skills,
               parallelToolCalls: validated.parallel_tool_calls,
-              supportsDeveloper: validated.supports_developer,
               effort: validated.effort,
             });
             await agent.checkForMigrations();

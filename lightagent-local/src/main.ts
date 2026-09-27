@@ -13,7 +13,7 @@ import {
 import * as v from "valibot";
 import { ReasoningEffort } from "@cle-does-things/llms-sdk-wasm";
 
-const VERSION = "0.1.5";
+const VERSION = "0.1.6";
 const IS_BETA = true;
 
 const HELP_MESSAGE = `
@@ -179,7 +179,6 @@ if (import.meta.main) {
       "json",
       "help",
       "version",
-      "supports-developer",
     ],
     alias: {
       help: "h",
@@ -204,7 +203,6 @@ if (import.meta.main) {
       json: false,
       help: false,
       version: false,
-      "supports-developer": true,
     },
   });
 
@@ -271,7 +269,6 @@ if (import.meta.main) {
     baseUrl: cmdOptions["base-url"],
     autoSkillDiscovery: cmdOptions["discover-skills"],
     effort: cmdOptions.effort as ReasoningEffort | undefined,
-    supportsDeveloper: cmdOptions["supports-developer"],
   });
 
   await agent.initWasm();

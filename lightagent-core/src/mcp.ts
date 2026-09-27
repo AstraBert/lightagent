@@ -27,7 +27,7 @@ export const McpServersDefinitionSchema = v.object({
 });
 
 const CLIENT_NAME = "lightagent-cli";
-const CLIENT_VERSION = "0.1.5";
+const CLIENT_VERSION = "0.1.6";
 
 function createTransport(server: McpServer) {
   switch (server.type) {
