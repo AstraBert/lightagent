@@ -125,7 +125,6 @@ export class LocalLightAgent {
   promptCaching: boolean;
   parallelToolCalls: boolean;
   effort: sdk.ReasoningEffort | undefined = undefined;
-  supportsDeveloper: boolean;
   storage: AgentStorage;
   private history: Message[] = [];
   private env: LocalEnvironment = new LocalEnvironment();
@@ -158,7 +157,6 @@ export class LocalLightAgent {
     parallelToolCalls?: boolean;
     mcpServers?: Record<string, McpServer>;
     effort?: sdk.ReasoningEffort;
-    supportsDeveloper?: boolean;
   }) {
     this.model = options.model;
     const { provider, apiKey } = resolveCredentials(
@@ -167,9 +165,6 @@ export class LocalLightAgent {
       options.apiKey,
     );
     this.effort = options.effort;
-    this.supportsDeveloper = typeof options.supportsDeveloper === "undefined"
-      ? true
-      : options.supportsDeveloper;
     this.provider = provider;
     this.apiKey = apiKey;
     this.baseUrl = options.baseUrl ??
@@ -437,7 +432,6 @@ export class LocalLightAgent {
       let assistantMessage: Message | null = null;
       sdk.streamChat(
         request,
-        this.supportsDeveloper,
         (err: string | null, chunk?: LLMStreamingResponse) => {
           if (options.abortSignal.aborted) {
             queue.push({ done: true, isInterrupt: true });
